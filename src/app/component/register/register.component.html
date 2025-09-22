@@ -6,20 +6,43 @@
   </div>
   <div class="form-section">
     <h2>Sign Up</h2>
-    <form (ngSubmit)="onSubmit()">
+    
+    <!-- Success Message -->
+    <div *ngIf="isSuccessful && successMessage" class="alert alert-success">
+      <i class="success-icon">✓</i>
+      {{ successMessage }}
+    </div>
+    
+    <!-- Error Message -->
+    <div *ngIf="isSignUpFailed && errorMessage" class="alert alert-error">
+      <i class="error-icon">⚠</i>
+      {{ errorMessage }}
+    </div>
+    
+    <form (ngSubmit)="onSubmit()" [class.disabled]="isLoading">
       <div class="form-group">
-        <input type="text" id="firstname" name="firstname" [(ngModel)]="register.firstName" class="form-control" placeholder="First Name" required>
+        <input type="text" id="firstname" name="firstname" [(ngModel)]="register.firstName" 
+               class="form-control" placeholder="First Name" required [disabled]="isLoading">
       </div>
       <div class="form-group">
-        <input type="text" id="lastname" name="lastname" [(ngModel)]="register.lastName" class="form-control" placeholder="Last Name" required>
+        <input type="text" id="lastname" name="lastname" [(ngModel)]="register.lastName" 
+               class="form-control" placeholder="Last Name" required [disabled]="isLoading">
       </div>
       <div class="form-group">
-        <input type="email" id="email" name="email" [(ngModel)]="register.email" class="form-control" placeholder="Email" required>
+        <input type="email" id="email" name="email" [(ngModel)]="register.email" 
+               class="form-control" placeholder="Email" required [disabled]="isLoading">
       </div>
       <div class="form-group">
-        <input type="password" id="password" name="password" [(ngModel)]="register.password" class="form-control" placeholder="Password" required>
+        <input type="password" id="password" name="password" [(ngModel)]="register.password" 
+               class="form-control" placeholder="Password" required [disabled]="isLoading">
       </div>
-      <button type="submit" class="btn-sign-up">Create Account</button>
+      <button type="submit" class="btn-sign-up" [disabled]="isLoading">
+        <span *ngIf="!isLoading">Create Account</span>
+        <span *ngIf="isLoading" class="loading-text">
+          <i class="loading-spinner"></i>
+          Creating Account...
+        </span>
+      </button>
       <p class="login-link">Already have an account? <a routerLink="/login">Sign In</a></p>
     </form>
   </div>

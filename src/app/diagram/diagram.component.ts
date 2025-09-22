@@ -328,35 +328,34 @@ export class DiagramComponent implements OnInit, OnDestroy {
       return iconMap[dataType] || '⚪';
     };
 
-    const getAttributeIconColor = (attribute: any): string => {
-      if (attribute.pk) return '#dc2626';
-      if (attribute.fk) return '#f59e0b';
-      if (attribute.unique) return '#8b5cf6';
-      return '#6366f1';
-    };
 
-    const getAttributeIconShape = (attribute: any): string => {
-      if (attribute.pk) return 'Diamond';
-      if (attribute.fk) return 'Triangle';
-      if (attribute.unique) return 'Pentagon';
-      return 'Circle';
-    };
-
-    const getAttributeSuffix = (attribute: any): string => {
-      const suffixes = [];
-      if (attribute.pk) suffixes.push('PK');
-      if (attribute.fk) suffixes.push('FK');
-      if (attribute.unique && !attribute.pk) suffixes.push('UQ');
-      if (attribute.autoIncrement) suffixes.push('AI');
-      if (!attribute.nullable) suffixes.push('NN');
-      return suffixes.length > 0 ? ` (${suffixes.join(', ')})` : '';
-    };
+    // Function to create tooltip with constraint information
 
     const itemTemplate = $(go.Panel, "Horizontal",
       {
         margin: new go.Margin(4, 0, 4, 0),
         stretch: go.GraphObject.Horizontal,
-        defaultAlignment: go.Spot.Left
+        defaultAlignment: go.Spot.Left,
+        // Add tooltip to the entire attribute row
+        toolTip: $("ToolTip",
+          $(go.TextBlock, 
+            { 
+              margin: 4,
+              font: "12px Inter, system-ui, sans-serif"
+            },
+            new go.Binding("text", "", (attribute: any) => {
+              const constraints = [];
+              if (attribute.pk) constraints.push('Primary Key');
+              if (attribute.fk) constraints.push('Foreign Key');
+              if (attribute.unique && !attribute.pk) constraints.push('Unique');
+              if (attribute.autoIncrement) constraints.push('Auto Increment');
+              if (!attribute.nullable) constraints.push('Not Null');
+              
+              const constraintText = constraints.length > 0 ? constraints.join(', ') : 'No constraints';
+              return `${attribute.name}\nType: ${attribute.type}\nConstraints: ${constraintText}`;
+            })
+          )
+        )
       },
       // Data type icon (emoji)
       $(go.TextBlock,
@@ -368,28 +367,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
         },
         new go.Binding("text", "type", getDataTypeIcon)
       ),
-      // Shape indicator (geometric shape for PK/FK/UNIQUE)
-      $(go.Shape,
-        {
-          width: 10,
-          height: 10,
-          margin: new go.Margin(0, 6, 0, 0),
-        },
-        new go.Binding("figure", "", getAttributeIconShape),
-        new go.Binding("fill", "", getAttributeIconColor),
-        new go.Binding("stroke", "", (attribute) => {
-          const color = getAttributeIconColor(attribute);
-          return color === '#dc2626' ? '#b91c1c' :
-                 color === '#f59e0b' ? '#d97706' :
-                 color === '#8b5cf6' ? '#7c3aed' : '#4f46e5';
-        })
-      ),
       // Attribute name
       $(go.TextBlock,
         {
           font: "14px Inter, system-ui, sans-serif",
           margin: new go.Margin(0, 6, 0, 0),
-          maxSize: new go.Size(100, NaN),
+          maxSize: new go.Size(120, NaN),
           overflow: go.TextBlock.OverflowEllipsis
         },
         new go.Binding("text", "name"),
@@ -404,22 +387,11 @@ export class DiagramComponent implements OnInit, OnDestroy {
           font: "12px Inter, system-ui, sans-serif",
           stroke: "#6b7280",
           margin: new go.Margin(0, 4, 0, 0),
-          maxSize: new go.Size(60, NaN),
+          maxSize: new go.Size(80, NaN),
           overflow: go.TextBlock.OverflowEllipsis
         },
         new go.Binding("text", "type"),
         new go.Binding("stroke", "", () => this.darkMode ? "#9ca3af" : "#6b7280")
-      ),
-      // Suffixes (PK, FK, UQ, AI, NN)
-      $(go.TextBlock,
-        {
-          font: "bold 10px Inter, system-ui, sans-serif",
-          margin: new go.Margin(0, 0, 0, 2),
-          maxSize: new go.Size(60, NaN),
-          overflow: go.TextBlock.OverflowEllipsis
-        },
-        new go.Binding("text", "", getAttributeSuffix),
-        new go.Binding("stroke", "", getAttributeIconColor)
       )
     );
 
@@ -781,106 +753,162 @@ export class DiagramComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // If clicking the same type, deselect it
+    if (this.selectedRelationshipType === type) {
+      this.cancelRelationshipSelection();
+      return;
+    }
+
     this.selectedRelationshipType = type;
     this.selectedEntities = [];
+    
+    // Show user feedback
+    console.log(`Relationship type '${type}' selected. Click on two tables to create relationship.`);
   }
 
+  cancelRelationshipSelection(): void {
+    this.selectedRelationshipType = null;
+    this.selectedEntities = [];
+    console.log('Relationship selection cancelled.');
+  }
+
+  // Improved entity click handler with better feedback
   entityClicked(entity: any): void {
+    if (!this.selectedRelationshipType) {
+      return;
+    }
+
     const hasPrimaryKey: boolean = entity.items.some((item: AttributeModel) : boolean => item.pk);
     if (!hasPrimaryKey) {
-      console.log(`Entity ${entity.key} does not have a primary key and cannot be part of a relationship.`);
+      console.warn(`Entity '${entity.key}' does not have a primary key and cannot be part of a relationship.`);
+      // Show user-friendly message
+      this.showEntityValidationMessage(entity.key, 'This table needs a primary key to create relationships.');
+      return;
+    }
+
+    // Check if entity is already selected
+    if (this.selectedEntities.find(e => e.key === entity.key)) {
+      console.log(`Entity '${entity.key}' is already selected for this relationship.`);
       return;
     }
 
     if (this.selectedRelationshipType && this.selectedEntities.length < 2) {
       this.selectedEntities.push(entity);
+      console.log(`Selected entity '${entity.key}' for ${this.selectedRelationshipType} relationship (${this.selectedEntities.length}/2)`);
     }
 
     if (this.selectedEntities.length === 2) {
-      if (this.selectedRelationshipType === 'N:N') {
-        const firstForeignKey: AttributeModel = {
-          name: `${this.selectedEntities[0].key}_id`,
-          // @ts-ignore
-          type: this.selectedEntities[0].items.filter(item => item.pk)[0].type,
-          pk: false,
-          fk: true,
-          unique: false,
-          defaultValue: '',
-          nullable: false,
-          autoIncrement: false
-        };
-
-        const secondForeignKey: AttributeModel = {
-          name: `${this.selectedEntities[1].key}_id`,
-          // @ts-ignore
-          type: this.selectedEntities[1].items.filter(item => item.pk)[0].type,
-          pk: false,
-          fk: true,
-          unique: false,
-          defaultValue: '',
-          nullable: false,
-          autoIncrement: false
-        };
-
-        const newIntermediaryEntity: IntermediaryEntityModel = {
-          id: crypto.randomUUID(),
-          key: `${this.selectedEntities[0].key}_${this.selectedEntities[1].key}`,
-          items: [firstForeignKey, secondForeignKey],
-          location: new go.Point(Math.random() * 400, Math.random() * 400),
-          firstEntityId: this.selectedEntities[0].key,
-          secondEntityId: this.selectedEntities[1].key
-        };
-
-        this.entities.push(newIntermediaryEntity);
-
-        const firstLinkData: LinkDataModel = {
-          id: crypto.randomUUID(),
-          from: this.selectedEntities[0].key,
-          to: newIntermediaryEntity.key,
-          text: '1:N',
-          toText: 1,
-        };
-
-        const secondLinkData: LinkDataModel = {
-          id: crypto.randomUUID(),
-          from: newIntermediaryEntity.key,
-          to: this.selectedEntities[1].key,
-          text: '1:N',
-          toText: 1,
-        };
-
-        this.createRelationship(firstLinkData);
-        this.createRelationship(secondLinkData);
-
-        this.remakeDiagram();
-      } else {
-        const foreignKeyAttribute: AttributeModel = {
-          name: `${this.selectedEntities[1].key}_id`,
-          // @ts-ignore
-          type: this.selectedEntities[1].items.filter(item => item.pk)[0].type,
-          pk: false,
-          fk: true,
-          unique: false,
-          defaultValue: '',
-          nullable: false,
-          autoIncrement: false
-        };
-
-        this.selectedEntities[0].items.push(foreignKeyAttribute);
-
-        const linkData: LinkDataModel = {
-          id: crypto.randomUUID(),
-          from: this.selectedEntities[0].key,
-          to: this.selectedEntities[1].key,
-          text: this.selectedRelationshipType,
-          toText: 1,
-        };
-
-        this.createRelationship(linkData);
-      }
-
-      this.selectedRelationshipType = null;
+      this.createRelationshipFromSelection();
     }
+  }
+
+  private createRelationshipFromSelection(): void {
+    if (!this.selectedRelationshipType || this.selectedEntities.length !== 2) {
+      return;
+    }
+
+    const relationshipType = this.selectedRelationshipType;
+    const sourceEntity = this.selectedEntities[0];
+    const targetEntity = this.selectedEntities[1];
+
+    console.log(`Creating ${relationshipType} relationship between '${sourceEntity.key}' and '${targetEntity.key}'`);
+
+    if (relationshipType === 'N:N') {
+      this.createManyToManyRelationship(sourceEntity, targetEntity);
+    } else {
+      this.createOneToOneOrOneToManyRelationship(sourceEntity, targetEntity, relationshipType);
+    }
+
+    // Reset selection
+    this.cancelRelationshipSelection();
+  }
+
+  private createManyToManyRelationship(sourceEntity: any, targetEntity: any): void {
+    const firstForeignKey: AttributeModel = {
+      name: `${sourceEntity.key}_id`,
+      // @ts-ignore
+      type: sourceEntity.items.filter(item => item.pk)[0].type,
+      pk: false,
+      fk: true,
+      unique: false,
+      defaultValue: '',
+      nullable: false,
+      autoIncrement: false
+    };
+
+    const secondForeignKey: AttributeModel = {
+      name: `${targetEntity.key}_id`,
+      // @ts-ignore
+      type: targetEntity.items.filter(item => item.pk)[0].type,
+      pk: false,
+      fk: true,
+      unique: false,
+      defaultValue: '',
+      nullable: false,
+      autoIncrement: false
+    };
+
+    const newIntermediaryEntity: IntermediaryEntityModel = {
+      id: crypto.randomUUID(),
+      key: `${sourceEntity.key}_${targetEntity.key}`,
+      items: [firstForeignKey, secondForeignKey],
+      location: new go.Point(Math.random() * 400, Math.random() * 400),
+      firstEntityId: sourceEntity.key,
+      secondEntityId: targetEntity.key
+    };
+
+    this.entities.push(newIntermediaryEntity);
+
+    const firstLinkData: LinkDataModel = {
+      id: crypto.randomUUID(),
+      from: sourceEntity.key,
+      to: newIntermediaryEntity.key,
+      text: '1:N',
+      toText: 1,
+    };
+
+    const secondLinkData: LinkDataModel = {
+      id: crypto.randomUUID(),
+      from: newIntermediaryEntity.key,
+      to: targetEntity.key,
+      text: '1:N',
+      toText: 1,
+    };
+
+    this.createRelationship(firstLinkData);
+    this.createRelationship(secondLinkData);
+    this.remakeDiagram();
+  }
+
+  private createOneToOneOrOneToManyRelationship(sourceEntity: any, targetEntity: any, relationshipType: '1:1' | '1:N'): void {
+    const foreignKeyAttribute: AttributeModel = {
+      name: `${targetEntity.key}_id`,
+      // @ts-ignore
+      type: targetEntity.items.filter(item => item.pk)[0].type,
+      pk: false,
+      fk: true,
+      unique: relationshipType === '1:1', // Unique constraint for 1:1 relationships
+      defaultValue: '',
+      nullable: false,
+      autoIncrement: false
+    };
+
+    sourceEntity.items.push(foreignKeyAttribute);
+
+    const linkData: LinkDataModel = {
+      id: crypto.randomUUID(),
+      from: sourceEntity.key,
+      to: targetEntity.key,
+      text: relationshipType,
+      toText: 1,
+    };
+
+    this.createRelationship(linkData);
+  }
+
+  private showEntityValidationMessage(entityKey: string, message: string): void {
+    // This could be replaced with a more sophisticated notification system
+    alert(`Entity '${entityKey}': ${message}`);
   }
 
   createRelationship(linkData: any): void {
@@ -889,25 +917,450 @@ export class DiagramComponent implements OnInit, OnDestroy {
     this.selectedEntities = [];
   }
 
+  /**
+   * Remove a relationship and all its dependencies (FKs and intermediary entities)
+   * @param id - ID of the relationship to be removed
+   */
   removeRelationship(id: string): void {
-    let relationshipToRemove: any = {};
-    const index: number = this.relationships.findIndex(r => r.id === id);
-
-    if (index !== -1) {
-      relationshipToRemove = this.relationships.splice(index, 1)[0];
+    console.log(`Removing relationship: ${id}`);
+    
+    const relationshipIndex: number = this.relationships.findIndex(r => r.id === id);
+    if (relationshipIndex === -1) {
+      console.warn(`Relationship with ID ${id} not found`);
+      return;
     }
 
-    if (relationshipToRemove.text === '1:1' || relationshipToRemove.text === '1:N') {
-      const entity: EntityModel | undefined = this.entities.find((e: EntityModel) : boolean => e.key === relationshipToRemove.from);
-      if (entity) {
-        const fkIndex: number = entity.items.findIndex((item: AttributeModel) : boolean => item.name === `${relationshipToRemove.to}_id`);
-        if (fkIndex !== -1) {
-          entity.items.splice(fkIndex, 1);
+    const relationshipToRemove = this.relationships[relationshipIndex];
+    console.log(`Relationship found:`, relationshipToRemove);
+
+    // Remove the relationship from the list
+    this.relationships.splice(relationshipIndex, 1);
+
+    // Process the removal based on the relationship type
+    this.processRelationshipRemoval(relationshipToRemove);
+
+    // Clean up orphaned intermediary entities (for N:N relationships)
+    this.cleanupOrphanedIntermediaryEntities();
+
+    // Verify cleanup was successful
+    this.verifyRelationshipRemoval(relationshipToRemove);
+
+    // Update the diagram
+    this.remakeDiagram();
+    
+    console.log(`✅ Relationship ${id} removed successfully`);
+  }
+
+  /**
+   * Process the removal of a relationship based on its type
+   * @param relationship - Relationship to be processed
+   */
+  private processRelationshipRemoval(relationship: any): void {
+    const relationshipType = relationship.text;
+    
+    switch (relationshipType) {
+      case '1:1':
+        this.removeOneToOneRelationship(relationship);
+        break;
+      case '1:N':
+        this.removeOneToManyRelationship(relationship);
+        break;
+      case 'N:1':
+        this.removeManyToOneRelationship(relationship);
+        break;
+      case 'N:N':
+        this.removeManyToManyRelationship(relationship);
+        break;
+      default:
+        console.warn(`⚠️ Unknown relationship type: ${relationshipType}`);
+    }
+  }
+
+  /**
+   * Remove foreign key of 1:1 relationship
+   * @param relationship - 1:1 relationship to be removed
+   */
+  private removeOneToOneRelationship(relationship: any): void {
+    console.log(`🔗 Removing 1:1 relationship between ${relationship.from} and ${relationship.to}`);
+    
+    // In 1:1 relationships, FK can be in either entity - check both directions
+    const fromEntity = this.findEntityByKey(relationship.from);
+    const toEntity = this.findEntityByKey(relationship.to);
+    
+    if (!fromEntity) {
+      console.error(`❌ From entity not found: ${relationship.from}`);
+      return;
+    }
+    
+    if (!toEntity) {
+      console.error(`❌ To entity not found: ${relationship.to}`);
+      return;
+    }
+
+    // Try to remove FK from "from" entity that references "to" entity
+    let fkRemoved = this.removeForeignKeyFromEntity(fromEntity, relationship.to);
+    
+    // If not found, try the reverse direction
+    if (!fkRemoved) {
+      fkRemoved = this.removeForeignKeyFromEntity(toEntity, relationship.from);
+    }
+    
+    if (!fkRemoved) {
+      console.warn(`⚠️ No FK found for 1:1 relationship between ${relationship.from} and ${relationship.to}`);
+    }
+  }
+
+  /**
+   * Remove foreign key of 1:N relationship
+   * @param relationship - 1:N relationship to be removed
+   */
+  private removeOneToManyRelationship(relationship: any): void {
+    console.log(`🔗 Removing 1:N relationship between ${relationship.from} and ${relationship.to}`);
+    
+    // In 1:N relationships, FK can be in either entity - check both directions
+    const fromEntity = this.findEntityByKey(relationship.from);
+    const toEntity = this.findEntityByKey(relationship.to);
+    
+    if (!fromEntity) {
+      console.error(`❌ From entity not found: ${relationship.from}`);
+      return;
+    }
+    
+    if (!toEntity) {
+      console.error(`❌ To entity not found: ${relationship.to}`);
+      return;
+    }
+
+    // Try to remove FK from "from" entity that references "to" entity
+    let fkRemoved = this.removeForeignKeyFromEntity(fromEntity, relationship.to);
+    
+    // If not found, try the reverse direction
+    if (!fkRemoved) {
+      fkRemoved = this.removeForeignKeyFromEntity(toEntity, relationship.from);
+    }
+    
+    if (!fkRemoved) {
+      console.warn(`⚠️ No FK found for 1:N relationship between ${relationship.from} and ${relationship.to}`);
+    }
+  }
+
+  /**
+   * Remove foreign key of N:1 relationship
+   * @param relationship - N:1 relationship to be removed
+   */
+  private removeManyToOneRelationship(relationship: any): void {
+    console.log(`🔗 Removing N:1 relationship between ${relationship.from} and ${relationship.to}`);
+    
+    // In N:1 relationships, the FK is always in the "from" entity (many side)
+    const manyEntity = this.findEntityByKey(relationship.from);
+    const oneEntity = this.findEntityByKey(relationship.to);
+    
+    if (!manyEntity) {
+      console.error(`❌ Many entity not found: ${relationship.from}`);
+      return;
+    }
+    
+    if (!oneEntity) {
+      console.error(`❌ One entity not found: ${relationship.to}`);
+      return;
+    }
+
+    // Remove FK from "many" entity that references "one" entity
+    console.log(`🔍 Looking for FK in ${manyEntity.key} that references ${oneEntity.key}`);
+    
+    // List all FKs in the many entity for debugging
+    const allFKs = manyEntity.items.filter(item => item.fk === true);
+    console.log(`📋 All FKs in ${manyEntity.key}:`, allFKs.map(fk => `${fk.name} (fk: ${fk.fk})`));
+    
+    const fkRemoved = this.removeForeignKeyFromEntity(manyEntity, relationship.to);
+    
+    if (!fkRemoved) {
+      console.warn(`⚠️ No FK found for N:1 relationship between ${relationship.from} and ${relationship.to}`);
+      // Try a more aggressive search
+      console.log(`🔍 Trying aggressive FK search...`);
+      for (let i = manyEntity.items.length - 1; i >= 0; i--) {
+        const item = manyEntity.items[i];
+        if (item.fk === true) {
+          console.log(`🗑️ Force removing FK: ${item.name} from ${manyEntity.key} (aggressive cleanup)`);
+          manyEntity.items.splice(i, 1);
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove N:N relationship by cleaning up intermediary entities
+   * @param relationship - N:N relationship to be removed
+   */
+  private removeManyToManyRelationship(relationship: any): void {
+    console.log(`🔗 Removing N:N relationship between ${relationship.from} and ${relationship.to}`);
+    
+    // For N:N relationships, we need to check if either entity is an intermediary
+    // and clean up appropriately
+    const fromEntity = this.findEntityByKey(relationship.from);
+    const toEntity = this.findEntityByKey(relationship.to);
+    
+    if (fromEntity && this.isIntermediaryEntity(fromEntity)) {
+      console.log(`📊 ${relationship.from} is an intermediary entity - marking for cleanup`);
+    }
+    
+    if (toEntity && this.isIntermediaryEntity(toEntity)) {
+      console.log(`📊 ${relationship.to} is an intermediary entity - marking for cleanup`);
+    }
+    
+    // The cleanup will happen in cleanupOrphanedIntermediaryEntities()
+    console.log(`🔗 N:N relationship marked for cleanup - intermediary entities will be removed automatically`);
+  }
+
+  /**
+   * Remove foreign key from entity that references another entity
+   * @param entity - Entity to remove FK from
+   * @param referencedEntityKey - Key of the referenced entity
+   * @returns true if FK was found and removed, false otherwise
+   */
+  private removeForeignKeyFromEntity(entity: EntityModel, referencedEntityKey: string): boolean {
+    console.log(`🔍 Searching for FK in ${entity.key} that references ${referencedEntityKey}`);
+    
+    // Find all foreign keys in the entity (items with fk: true)
+    const foreignKeys = entity.items.filter(item => item.fk === true);
+    console.log(`📋 Found ${foreignKeys.length} foreign keys in ${entity.key}:`, foreignKeys.map(fk => fk.name));
+    
+    if (foreignKeys.length === 0) {
+      console.log(`⚠️ No foreign keys found in ${entity.key}`);
+      return false;
+    }
+
+    // Look for FK that likely references the target entity by name pattern
+    // Handle both singular and plural forms
+    const entitySingular = this.getSingularForm(referencedEntityKey);
+    console.log(`🔤 Entity forms: "${referencedEntityKey}" → singular: "${entitySingular}"`);
+    
+    const possibleFKNames = [
+      `${referencedEntityKey}_id`,
+      `${referencedEntityKey}Id`,
+      `${referencedEntityKey.toLowerCase()}_id`,
+      `${entitySingular}_id`,
+      `${entitySingular}Id`,
+      `${entitySingular.toLowerCase()}_id`,
+      `id_${referencedEntityKey}`,
+      `fk_${referencedEntityKey}`,
+      `${referencedEntityKey.toUpperCase()}_ID`,
+      `${entitySingular.toUpperCase()}_ID`
+    ];
+
+    // First, try exact matches with common naming patterns
+    for (const fkName of possibleFKNames) {
+      console.log(`🔍 Checking pattern: "${fkName}"`);
+      const fkIndex = entity.items.findIndex(item => 
+        item.fk === true && item.name.toLowerCase() === fkName.toLowerCase()
+      );
+      
+      if (fkIndex !== -1) {
+        const removedFK = entity.items.splice(fkIndex, 1)[0];
+        console.log(`🗑️ FK removed by exact match: ${removedFK.name} from entity ${entity.key}`);
+        return true;
+      } else {
+        // Debug: show what we're comparing
+        const matchingNames = foreignKeys.filter(fk => fk.name.toLowerCase() === fkName.toLowerCase());
+        if (matchingNames.length > 0) {
+          console.log(`🔍 Found name match but not FK: ${matchingNames[0].name} (fk: ${matchingNames[0].fk})`);
         }
       }
     }
 
-    this.remakeDiagram();
+    // If exact match not found, search for any FK that contains the referenced entity name
+    const relatedFKs = foreignKeys.filter(item => {
+      const itemName = item.name.toLowerCase();
+      const entityName = referencedEntityKey.toLowerCase();
+      const singularName = entitySingular.toLowerCase();
+      
+      return itemName.includes(entityName) || itemName.includes(singularName);
+    });
+
+    if (relatedFKs.length > 0) {
+      console.log(`🤔 Found ${relatedFKs.length} possible related FKs by name pattern:`, relatedFKs.map(fk => fk.name));
+      // Remove the most likely match (shortest name that contains the reference)
+      const fkToRemove = relatedFKs.sort((a, b) => a.name.length - b.name.length)[0];
+      const fkIndex = entity.items.findIndex(item => item === fkToRemove);
+      if (fkIndex !== -1) {
+        entity.items.splice(fkIndex, 1);
+        console.log(`🗑️ FK removed by name pattern: ${fkToRemove.name} from entity ${entity.key}`);
+        return true;
+      }
+    }
+
+    console.log(`⚠️ No FK found in ${entity.key} that references ${referencedEntityKey}`);
+    return false;
+  }
+
+  /**
+   * Search and remove related FK when the default search fails (deprecated - kept for compatibility)
+   * @param entity - Entity to search for
+   * @param referencedEntityKey - Key of the referenced entity
+   */
+  private findAndRemoveRelatedForeignKey(entity: EntityModel, referencedEntityKey: string): void {
+    this.removeForeignKeyFromEntity(entity, referencedEntityKey);
+  }
+
+  /**
+   * Remove orphaned intermediary entities (N:N relationships)
+   */
+  private cleanupOrphanedIntermediaryEntities(): void {
+    console.log(`🧹 Cleaning up orphaned intermediary entities...`);
+    
+    const intermediaryEntities = this.entities.filter(entity => 
+      this.isIntermediaryEntity(entity)
+    );
+
+    console.log(`📊 Found ${intermediaryEntities.length} intermediary entities for verification`);
+    
+    let removedCount = 0;
+    const entitiesToRemove: string[] = [];
+
+    for (const intermediaryEntity of intermediaryEntities) {
+      const relatedRelationships = this.relationships.filter(rel => 
+        rel.from === intermediaryEntity.key || rel.to === intermediaryEntity.key
+      );
+
+      console.log(`🔗 Intermediary entity ${intermediaryEntity.key} has ${relatedRelationships.length} relationships`);
+
+      // If an intermediary entity has less than 2 relationships, it is orphaned
+      if (relatedRelationships.length < 2) {
+        console.log(`🗑️ Marking orphaned intermediary entity for removal: ${intermediaryEntity.key}`);
+        entitiesToRemove.push(intermediaryEntity.key);
+      }
+    }
+    
+    // Remove marked entities and their relationships
+    for (const entityKey of entitiesToRemove) {
+      // Remove all relationships from this entity
+      this.relationships = this.relationships.filter(rel => 
+        rel.from !== entityKey && rel.to !== entityKey
+      );
+      
+      // Remove the intermediary entity
+      const entityIndex = this.entities.findIndex(e => e.key === entityKey);
+      if (entityIndex !== -1) {
+        this.entities.splice(entityIndex, 1);
+        removedCount++;
+        console.log(`✅ Intermediary entity ${entityKey} removed`);
+      }
+    }
+    
+    if (removedCount > 0) {
+      console.log(`🧹 Cleanup completed: ${removedCount} orphaned intermediary entities removed`);
+    } else {
+      console.log(`✅ No orphaned intermediary entities found`);
+    }
+  }
+
+  /**
+   * Check if an entity is an intermediary entity (N:N)
+   * @param entity - Entity to be checked
+   * @returns true if it is an intermediary entity
+   */
+  private isIntermediaryEntity(entity: EntityModel): boolean {
+    // Check if it is an IntermediaryEntityModel
+    const intermediaryEntity = entity as IntermediaryEntityModel;
+    if (intermediaryEntity.firstEntityId && intermediaryEntity.secondEntityId) {
+      return true;
+    }
+
+    // Check if it follows the naming pattern of intermediary entities
+    const hasUnderscore = entity.key.includes('_');
+    if (!hasUnderscore) {
+      return false;
+    }
+
+    // Check if all attributes are FKs (characteristic of intermediary entity)
+    const allAttributesAreFKs = entity.items.length > 0 && 
+      entity.items.every(item => item.fk === true);
+
+    // Check if it has exactly 2 FKs (common pattern for N:N)
+    const hasTwoFKs = entity.items.filter(item => item.fk === true).length === 2;
+
+    return allAttributesAreFKs && hasTwoFKs;
+  }
+
+  /**
+   * Verify that relationship removal was successful
+   * @param relationship - The relationship that was removed
+   */
+  private verifyRelationshipRemoval(relationship: any): void {
+    console.log(`🔍 Verifying removal of relationship between ${relationship.from} and ${relationship.to}`);
+    
+    const fromEntity = this.findEntityByKey(relationship.from);
+    const toEntity = this.findEntityByKey(relationship.to);
+    
+    // Check for orphaned FKs that might reference the relationship
+    if (fromEntity) {
+      const remainingFKs = fromEntity.items.filter(item => item.fk === true);
+      const orphanedFKs = remainingFKs.filter(item => 
+        item.name.toLowerCase().includes(relationship.to.toLowerCase()) ||
+        item.name.toLowerCase().includes(`${relationship.to.toLowerCase()}_id`)
+      );
+      
+      if (orphanedFKs.length > 0) {
+        console.warn(`⚠️ Found ${orphanedFKs.length} potentially orphaned FKs in ${fromEntity.key}:`, 
+          orphanedFKs.map(fk => fk.name));
+      } else if (remainingFKs.length > 0) {
+        console.log(`✅ ${fromEntity.key} has ${remainingFKs.length} remaining FKs (not related to removed relationship):`, 
+          remainingFKs.map(fk => fk.name));
+      } else {
+        console.log(`✅ ${fromEntity.key} has no remaining FKs`);
+      }
+    }
+    
+    if (toEntity) {
+      const remainingFKs = toEntity.items.filter(item => item.fk === true);
+      const orphanedFKs = remainingFKs.filter(item => 
+        item.name.toLowerCase().includes(relationship.from.toLowerCase()) ||
+        item.name.toLowerCase().includes(`${relationship.from.toLowerCase()}_id`)
+      );
+      
+      if (orphanedFKs.length > 0) {
+        console.warn(`⚠️ Found ${orphanedFKs.length} potentially orphaned FKs in ${toEntity.key}:`, 
+          orphanedFKs.map(fk => fk.name));
+      } else if (remainingFKs.length > 0) {
+        console.log(`✅ ${toEntity.key} has ${remainingFKs.length} remaining FKs (not related to removed relationship):`, 
+          remainingFKs.map(fk => fk.name));
+      } else {
+        console.log(`✅ ${toEntity.key} has no remaining FKs`);
+      }
+    }
+    
+    console.log(`✅ Relationship removal verification completed`);
+  }
+
+  /**
+   * Get singular form of a word (simple implementation)
+   * @param word - The word to convert to singular
+   * @returns Singular form of the word
+   */
+  private getSingularForm(word: string): string {
+    const lowerWord = word.toLowerCase();
+    
+    // Handle common plural patterns
+    if (lowerWord.endsWith('ies')) {
+      return word.slice(0, -3) + 'y';
+    } else if (lowerWord.endsWith('es')) {
+      return word.slice(0, -2);
+    } else if (lowerWord.endsWith('s') && !lowerWord.endsWith('ss')) {
+      return word.slice(0, -1);
+    }
+    
+    // If no plural pattern found, return as-is
+    return word;
+  }
+
+  /**
+   * Find an entity by its key
+   * @param key - Key of the entity
+   * @returns Found entity or undefined
+   */
+  private findEntityByKey(key: string): EntityModel | undefined {
+    return this.entities.find(entity => entity.key === key);
   }
 
   remakeDiagram(): void {

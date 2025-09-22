@@ -50,21 +50,26 @@
             <tbody>
               <tr *ngFor="let item of entity.items; let i = index" [class.has-error]="getAttributeError(item)">
                 <td>
-                  <input class="form-control" 
-                         [class.is-valid]="validateAttributeName(item) && item.name"
-                         [class.is-invalid]="getAttributeError(item)"
-                         [(ngModel)]="item.name" 
-                         type="text" 
-                         placeholder="Attribute name">
-                  <small class="text-danger" *ngIf="getAttributeError(item)">{{ getAttributeError(item) }}</small>
+                  <div class="input-with-validation">
+                    <input class="form-control" 
+                           [class.is-valid]="validateAttributeName(item) && item.name"
+                           [class.is-invalid]="getAttributeError(item)"
+                           [(ngModel)]="item.name" 
+                           type="text" 
+                           placeholder="Attribute name">
+                    <small class="text-danger" *ngIf="getAttributeError(item)">{{ getAttributeError(item) }}</small>
+                  </div>
                 </td>
                 <td>
-                  <select class="form-control" 
-                          [class.is-invalid]="!item.type"
-                          [(ngModel)]="item.type">
-                    <option value="">Select type</option>
-                    <option *ngFor="let type of dataTypes" [value]="type">{{type}}</option>
-                  </select>
+                  <div class="input-with-validation">
+                    <select class="form-control" 
+                            [class.is-invalid]="!item.type"
+                            [(ngModel)]="item.type">
+                      <option value="">Select type</option>
+                      <option *ngFor="let type of dataTypes" [value]="type">{{type}}</option>
+                    </select>
+                    <small class="text-danger" *ngIf="!item.type && item.name">Type is required</small>
+                  </div>
                 </td>
                 <td>
                   <input [(ngModel)]="item.pk" 
@@ -86,7 +91,11 @@
                          type="checkbox" 
                          title="Auto Increment">
                 </td>
-                <td><input class="form-control" [(ngModel)]="item.defaultValue" type="text" placeholder="Default value"></td>
+                <td>
+                  <div class="input-with-validation">
+                    <input class="form-control" [(ngModel)]="item.defaultValue" type="text" placeholder="Default value">
+                  </div>
+                </td>
                 <td>
                   <button class="btn btn-danger" (click)="removeAttribute(i)" title="Remove attribute">
                     <i class="bi bi-trash"></i>

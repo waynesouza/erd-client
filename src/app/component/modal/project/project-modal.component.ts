@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { StorageService } from '../../../service/storage.service';
 import { ProjectService } from '../../../service/project.service';
 import { DiagramService } from '../../../service/diagram.service';
-import { CreateProjectDto, Project, ProjectUser, UpdateProjectDto } from '../../../model/project.model';
+import { Project, ProjectUser, CreateProjectDto, UpdateProjectDto } from '../../../model/project.model';
 
 @Component({
   selector: 'app-project-modal',
@@ -13,6 +13,7 @@ export class ProjectModalComponent implements OnInit {
   @Input() isEditMode: boolean = false;
   @Input() projectToEdit: Project | null = null;
   @Output() modalClosed = new EventEmitter<boolean>();
+  @Output() projectCreated = new EventEmitter<string>();
 
   currentUser: ProjectUser | null = null;
   showAddMemberModal = false;
@@ -239,11 +240,9 @@ export class ProjectModalComponent implements OnInit {
       roleProjectEnum: this.newMemberRole
     };
 
-    console.log('Adding team member:', teamMember);
 
     this.projectService.addTeamMember(teamMember).subscribe({
       next: (response: any) => {
-        console.log('Add member response:', response);
         if (this.projectToEdit && response.body) {
           // Convert backend response to frontend model
           const newMember = {
@@ -254,7 +253,6 @@ export class ProjectModalComponent implements OnInit {
             role: response.body.role
           };
           this.projectToEdit.usersDto.push(newMember);
-          console.log('Member added successfully:', newMember);
         }
         this.cancelAddMember();
       },
@@ -307,7 +305,6 @@ export class ProjectModalComponent implements OnInit {
 
       this.projectService.updateTeamMember(updateTeamMember).subscribe({
         next: (response: any) => {
-          console.log('Update member response:', response);
           if (this.projectToEdit && response.body && this.memberBeingEdited) {
             const index = this.projectToEdit.usersDto.findIndex(m => m.id === this.memberBeingEdited!.id);
             if (index !== -1) {
@@ -319,7 +316,6 @@ export class ProjectModalComponent implements OnInit {
                 lastName: response.body.lastName,
                 role: response.body.role
               };
-              console.log('Member updated successfully');
             }
           }
           this.cancelEditMember();
@@ -343,11 +339,8 @@ export class ProjectModalComponent implements OnInit {
 
     // Não pode mudar o papel de si mesmo
     if (member.email === this.currentUser?.email) {
-      console.log('Cannot change own role');
       return;
     }
-
-    console.log('Updating member role:', { member, newRole });
 
     const updateTeamMember = {
       projectId: this.projectToEdit.id,
@@ -357,7 +350,6 @@ export class ProjectModalComponent implements OnInit {
 
     this.projectService.updateTeamMember(updateTeamMember).subscribe({
       next: (response: any) => {
-        console.log('Update role response:', response);
         if (this.projectToEdit && response.body) {
           const index = this.projectToEdit.usersDto.findIndex(m => m.id === member.id);
           if (index !== -1) {
@@ -369,7 +361,6 @@ export class ProjectModalComponent implements OnInit {
               lastName: response.body.lastName,
               role: response.body.role
             };
-            console.log('Member role updated successfully');
           }
         }
       },
@@ -447,18 +438,26 @@ export class ProjectModalComponent implements OnInit {
     this.newProject.userEmail = this.currentUser.email;
 
     this.projectService.createProject(this.newProject).subscribe({
-      next: (response: any) => {
-        if (response.body) {
+      next: (project: any) => {
+        if (project && project.id) {
+          const projectId = project.id;
           const diagram = {
-            projectId: response.body.id
+            projectId: projectId
           };
           this.diagramService.createDiagram(diagram).subscribe({
-            next: () => this.closeModal(),
+            next: () => {
+              this.projectCreated.emit(projectId);
+              this.closeModal();
+            },
             error: (error: any) => {
               console.error('Error creating diagram:', error);
-              alert('Project created but failed to create diagram. Please try again.');
+              this.projectCreated.emit(projectId);
+              this.closeModal();
+              alert('Project created successfully, but there was an issue creating the diagram. You can still use the project.');
             }
           });
+        } else {
+          console.error('No project ID from project creation response');
         }
       },
       error: (error: any) => {

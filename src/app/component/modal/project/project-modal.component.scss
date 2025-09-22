@@ -426,9 +426,40 @@ textarea.form-control {
         appearance: none;
         background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
         background-repeat: no-repeat;
-        background-position: right 12px center;
-        background-size: 16px;
-        padding-right: 40px;
+        background-position: right 16px center;
+        background-size: 20px;
+        padding-right: 50px;
+        min-height: 44px;
+        line-height: 1.5;
+        overflow: visible;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        
+        option {
+          padding: 8px 16px;
+          background-color: white;
+          color: $text-color;
+          border: none;
+          
+          &:checked {
+            background-color: $accent-color;
+            color: white;
+          }
+          
+          &:hover {
+            background-color: $hover-bg;
+          }
+        }
+        
+        &:focus {
+          outline: none;
+          border-color: $accent-color;
+          box-shadow: 0 0 0 3px rgba($accent-color, 0.1);
+          
+          option {
+            color: $text-color;
+          }
+        }
       }
     }
   }
@@ -538,9 +569,40 @@ textarea.form-control {
         appearance: none;
         background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
         background-repeat: no-repeat;
-        background-position: right 12px center;
-        background-size: 16px;
-        padding-right: 40px;
+        background-position: right 16px center;
+        background-size: 20px;
+        padding-right: 50px;
+        min-height: 44px;
+        line-height: 1.5;
+        overflow: visible;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        
+        option {
+          padding: 8px 16px;
+          background-color: white;
+          color: $text-color;
+          border: none;
+          
+          &:checked {
+            background-color: $accent-color;
+            color: white;
+          }
+          
+          &:hover {
+            background-color: $hover-bg;
+          }
+        }
+        
+        &:focus {
+          outline: none;
+          border-color: $accent-color;
+          box-shadow: 0 0 0 3px rgba($accent-color, 0.1);
+          
+          option {
+            color: $text-color;
+          }
+        }
       }
     }
   }
@@ -621,6 +683,18 @@ textarea.form-control {
 
     .modal-body {
       padding: 16px;
+      
+      // Melhora para campos Role em dispositivos móveis
+      .role-select {
+        min-height: 48px;
+        font-size: 16px; // Evita zoom no iOS
+        -webkit-appearance: none;
+        
+        option {
+          padding: 16px !important;
+          font-size: 16px;
+        }
+      }
     }
 
     .modal-footer {
@@ -647,6 +721,18 @@ textarea.form-control {
 
     .modal-body {
       padding: 16px;
+      
+      // Melhora para campos Role em dispositivos móveis
+      .role-select {
+        min-height: 48px;
+        font-size: 16px; // Evita zoom no iOS
+        -webkit-appearance: none;
+        
+        option {
+          padding: 16px !important;
+          font-size: 16px;
+        }
+      }
     }
 
     .modal-footer {
@@ -660,5 +746,42 @@ textarea.form-control {
         justify-content: center;
       }
     }
+  }
+}
+
+// Estilos específicos para o campo Role
+.role-select {
+  // Garantir que o texto do Role seja sempre visível
+  font-weight: 500;
+  text-transform: capitalize;
+  
+  option {
+    font-weight: 500;
+    text-transform: capitalize;
+    padding: 12px 16px !important;
+    font-size: 14px;
+    
+    &[value="OWNER"] {
+      color: #1976d2;
+      font-weight: 600;
+    }
+    
+    &[value="EDITOR"] {
+      color: #2e7d32;
+      font-weight: 600;
+    }
+    
+    &[value="VIEWER"] {
+      color: #616161;
+      font-weight: 500;
+    }
+  }
+  
+  // Força o campo a ter largura suficiente para mostrar todo o texto
+  min-width: 120px;
+  
+  // Garante que o dropdown seja renderizado corretamente
+  &::-ms-expand {
+    display: none;
   }
 }

@@ -16,6 +16,8 @@ import { Project } from '../model/project.model';
 import { StorageService } from '../service/storage.service';
 import { AuthResponseModel } from '../model/auth-response.model';
 import { SqlValidationService, ValidationResult } from '../service/sql-validation.service';
+import { environment } from '../../environments/environment';
+import { StompSubscription } from '@stomp/stompjs';
 
 const $ = go.GraphObject.make;
 
@@ -52,6 +54,8 @@ export class DiagramComponent implements OnInit, OnDestroy {
   public diagram: go.Diagram = null;
 
   private stompClient!: Client;
+  private diagramSubscription: StompSubscription | null = null;
+  private collaborationSubscription: StompSubscription | null = null;
 
   constructor(
     private diagramService: DiagramService,
@@ -67,8 +71,9 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // WebSocket configuration using @stomp/stompjs
+    const wsBaseUrl = environment.apiUrl.replace('/api', '');
     this.stompClient = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/api/send'),
+      webSocketFactory: () => new SockJS(`${wsBaseUrl}/ws`),
       connectHeaders: {},
       debug: (str: string) => {
         console.log('STOMP Debug:', str);
@@ -80,16 +85,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     this.stompClient.onConnect = (frame: any) => {
       console.log('Connected: ' + frame);
-      this.stompClient.subscribe('/topic/receive', (message: any) => {
-        console.log('Received message from server:', message);
-        this.receiveMessageAndRemakeDiagram(message);
-      });
-
-      // Subscribe to collaboration posts
-      this.stompClient.subscribe('/topic/collaboration', (message: any) => {
-        const collaborationMessage: CollaborationMessage = JSON.parse(message.body);
-        this.collaborationService.processCollaborationMessage(collaborationMessage);
-      });
+      this.subscribeToProjectTopics();
     };
 
     this.stompClient.onStompError = (frame: any) => {
@@ -103,9 +99,11 @@ export class DiagramComponent implements OnInit, OnDestroy {
     this.sharedService.currentProjectId.subscribe((projectId: any) => {
       if (projectId) {
         this.projectId = projectId;
+        this.subscribeToProjectTopics();
         this.loadProjectData(projectId);
         this.loadDiagramData(projectId);
       } else {
+        this.unsubscribeFromProjectTopics();
         this.clearProjectData();
       }
     });
@@ -287,7 +285,37 @@ export class DiagramComponent implements OnInit, OnDestroy {
     this.initializeDiagram();
   }
 
+  private subscribeToProjectTopics(): void {
+    if (!this.stompClient?.connected || !this.projectId) {
+      return;
+    }
+
+    this.unsubscribeFromProjectTopics();
+
+    this.diagramSubscription = this.stompClient.subscribe(`/topic/diagram/${this.projectId}`, (message: any) => {
+      console.log('Received message from server:', message);
+      this.receiveMessageAndRemakeDiagram(message);
+    });
+
+    this.collaborationSubscription = this.stompClient.subscribe(`/topic/collaboration/${this.projectId}`, (message: any) => {
+      const collaborationMessage: CollaborationMessage = JSON.parse(message.body);
+      this.collaborationService.processCollaborationMessage(collaborationMessage);
+    });
+  }
+
+  private unsubscribeFromProjectTopics(): void {
+    if (this.diagramSubscription) {
+      this.diagramSubscription.unsubscribe();
+      this.diagramSubscription = null;
+    }
+    if (this.collaborationSubscription) {
+      this.collaborationSubscription.unsubscribe();
+      this.collaborationSubscription = null;
+    }
+  }
+
   ngOnDestroy(): void {
+    this.unsubscribeFromProjectTopics();
     if (this.diagram) {
       this.diagram.div = null;
       // @ts-ignore

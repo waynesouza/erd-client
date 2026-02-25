@@ -3,8 +3,9 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { StorageService } from './storage.service';
 import { AuthResponseModel } from '../model/auth-response.model';
+import { environment } from '../../environments/environment';
 
-const BASE_URL = 'http://localhost:8080/api/collaboration';
+const BASE_URL = `${environment.apiUrl}/collaboration`;
 const httpOptions = { headers: new HttpHeaders({'Content-Type': 'application/json'}) };
 
 export interface EntityLock {

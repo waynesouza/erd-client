@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo
+    restart: always
+    env_file: .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    ports:
+      - ${MONGO_PORT}:${MONGO_PORT}
+    volumes:
+      - mongo_data:/data/db
+
+  postgres:
+    image: postgres
+    restart: always
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - ${POSTGRES_PORT}:${POSTGRES_PORT}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  erd-core:
+    image: erd-core
+    depends_on:
+      - mongo
+      - postgres
+    build: ../erd-core
+    restart: on-failure
+    env_file: .env
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url": "jdbc:postgresql://postgres:${POSTGRES_PORT}/${POSTGRES_DB}",
+        "spring.datasource.username": "${POSTGRES_USER}",
+        "spring.datasource.password": "${POSTGRES_PASSWORD}",
+        "spring.datasource.driver-class-name": "org.postgresql.Driver",
+        "spring.datasource.jpa.hibernate.ddl-auto": "update",
+        "spring.datasource.jpa.show-sql": "true",
+        "spring.data.mongodb.uri": "mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:${MONGO_PORT}/${MONGO_DB}?authSource=admin",
+        "erd.app.jwt.secret": "${JWT_SECRET}",
+        "erd.app.jwt.expiration": "${JWT_EXPIRATION}",
+        "erd.app.jwt.refresh-expiration": "${JWT_REFRESH_EXPIRATION}",
+        "erd.app.jwt.cookie-name": "${JWT_COOKIE_NAME}",
+        "erd.app.jwt.refresh-cookie-name": "${JWT_REFRESH_COOKIE_NAME}"
+      }'
+    ports:
+      - ${SPRING_LOCAL_PORT}:${SPRING_DOCKER_PORT}
+    volumes:
+      - maven_cache:/root/.m2
+    stdin_open: true
+    tty: true
+
+  erd-client:
+    image: erd-client
+    build: .
+    depends_on:
+      - erd-core
+    restart: always
+    env_file: .env
+    ports:
+      - ${CLIENT_LOCAL_PORT}:${CLIENT_DOCKER_PORT}
+
+volumes:
+  postgres_data:
+  mongo_data:
+  maven_cache:

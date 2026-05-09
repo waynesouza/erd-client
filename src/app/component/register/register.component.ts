@@ -19,19 +19,32 @@ export class RegisterComponent {
   };
   isSuccessful = false;
   isSignUpFailed = false;
+  isLoading = false;
   errorMessage = '';
+  successMessage = '';
 
   constructor(private authService: AuthService, private router: Router) { }
 
   onSubmit() {
+    this.isLoading = true;
+    this.isSignUpFailed = false;
+    this.errorMessage = '';
+    
     this.authService.register(this.register).subscribe({
       next: () => {
         this.isSuccessful = true;
         this.isSignUpFailed = false;
-        this.router.navigate(['/login']).then();
+        this.isLoading = false;
+        this.successMessage = 'Conta criada com sucesso! Verificamos também seu email. Redirecionando para o login...';
+        
+        // Redirect after showing success message
+        setTimeout(() => {
+          this.router.navigate(['/login']).then();
+        }, 3000);
       },
       error: (err) => {
-        this.errorMessage = err.error.message;
+        this.isLoading = false;
+        this.errorMessage = err.error?.message || err.error || 'Erro ao criar conta. Tente novamente.';
         this.isSignUpFailed = true;
       }
     });

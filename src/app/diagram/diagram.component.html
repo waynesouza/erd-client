@@ -23,44 +23,50 @@
   </div>
 
   <!-- Container for toolbar and diagram area -->
-  <div class="toolbar-container" [class.no-project]="!projectId">
+  <div class="toolbar-container" [class.no-project]="!projectId" [class.relationship-selection-active]="selectedRelationshipType">
     <!-- Toolbar with conditional visibility based on permissions -->
     <div class="toolbar" *ngIf="projectId && canEdit">
       <div class="tool-group">
-        <button class="tool-button" type="button" (click)="addEntity()" title="Add Table">
+        <button class="tool-button add-table-btn" type="button" (click)="addEntity()" title="Add New Table">
           <i class="bi bi-table"></i>
         </button>
       </div>
       <div class="tool-group">
-        <button class="tool-button" type="button" (click)="selectRelationshipType('1:1')" title="One to One Relationship">
-          <i class="bi bi-arrows-angle-contract"></i>
-        </button>
-        <button class="tool-button" type="button" (click)="selectRelationshipType('1:N')" title="One to Many Relationship">
-          <i class="bi bi-arrow-up-right"></i>
-        </button>
-        <button class="tool-button" type="button" (click)="selectRelationshipType('N:N')" title="Many to Many Relationship">
-          <i class="bi bi-arrows-angle-expand"></i>
+        <button class="tool-button relationship-btn one-to-one" 
+                [class.active]="selectedRelationshipType === '1:1'"
+                type="button" 
+                (click)="selectRelationshipType('1:1')" 
+                title="One to One (1:1) - Each record relates to exactly one record">1:1</button>
+        <button class="tool-button relationship-btn one-to-many" 
+                [class.active]="selectedRelationshipType === '1:N'"
+                type="button" 
+                (click)="selectRelationshipType('1:N')" 
+                title="One to Many (1:N) - One record relates to multiple records">1:n</button>
+        <button class="tool-button relationship-btn many-to-many" 
+                [class.active]="selectedRelationshipType === 'N:N'"
+                type="button" 
+                (click)="selectRelationshipType('N:N')" 
+                title="Many to Many (N:N) - Multiple records relate to multiple records">n:n</button>
+      </div>
+      <div class="tool-group">
+        <button class="tool-button save-btn" type="button" (click)="sendToServer()" title="Save Diagram to Server">
+          <i class="bi bi-floppy"></i>
         </button>
       </div>
       <div class="tool-group">
-        <button class="tool-button" type="button" (click)="sendToServer()" title="Save Diagram">
-          <i class="bi bi-check-circle"></i>
+        <button class="tool-button export-btn" type="button" (click)="exportDdl()" title="Export SQL DDL Script">
+          <i class="bi bi-file-earmark-code"></i>
+        </button>
+        <button class="tool-button import-btn" type="button" (click)="importDdl()" title="Import SQL DDL Script" *ngIf="userRole !== 'VIEWER'">
+          <i class="bi bi-file-earmark-arrow-up"></i>
         </button>
       </div>
       <div class="tool-group">
-        <button class="tool-button" type="button" (click)="exportDdl()" title="Export DDL">
-          <i class="bi bi-download"></i>
-        </button>
-        <button class="tool-button" type="button" (click)="importDdl()" title="Import DDL" *ngIf="userRole !== 'VIEWER'">
-          <i class="bi bi-upload"></i>
-        </button>
-      </div>
-      <div class="tool-group">
-        <button class="tool-button validation-button" type="button" (click)="showValidationReport()" title="Validate Diagram">
+        <button class="tool-button validation-button" type="button" (click)="showValidationReport()" title="Validate Database Schema">
           <i class="bi bi-shield-check"></i>
         </button>
-        <button class="tool-button legend-button" type="button" (click)="showLegend = !showLegend" title="Toggle Legend">
-          <i class="bi bi-info-circle"></i>
+        <button class="tool-button legend-button" type="button" (click)="showLegend = !showLegend" title="Show/Hide Legend">
+          <i class="bi bi-info-circle-fill"></i>
         </button>
       </div>
     </div>
@@ -95,20 +101,25 @@
         <div class="legend-grid">
           <div class="legend-section">
             <div class="legend-title">Data Types</div>
-            <div class="legend-item"><span>🔢</span> Numbers</div>
-            <div class="legend-item"><span>💰</span> Decimals</div>
-            <div class="legend-item"><span>📝</span> Text</div>
+            <div class="legend-item"><span>🔢</span> Numbers (INTEGER, BIGINT)</div>
+            <div class="legend-item"><span>💰</span> Decimals (DECIMAL, NUMERIC)</div>
+            <div class="legend-item"><span>📝</span> Text (VARCHAR, CHAR)</div>
+            <div class="legend-item"><span>📄</span> Long Text (TEXT)</div>
             <div class="legend-item"><span>☑️</span> Boolean</div>
             <div class="legend-item"><span>📅</span> Date</div>
             <div class="legend-item"><span>🗓️</span> DateTime</div>
             <div class="legend-item"><span>⏰</span> Timestamp</div>
+            <div class="legend-item"><span>🆔</span> UUID</div>
           </div>
           <div class="legend-section">
-            <div class="legend-title">Properties</div>
-            <div class="legend-item"><span class="shape diamond"></span> Primary Key</div>
-            <div class="legend-item"><span class="shape triangle"></span> Foreign Key</div>
-            <div class="legend-item"><span class="shape pentagon"></span> Unique</div>
-            <div class="legend-item"><span class="shape circle"></span> Normal</div>
+            <div class="legend-title">Attribute Info</div>
+            <div class="legend-item"><span>💡</span> Hover over attributes</div>
+            <div class="legend-item"><span>ℹ️</span> to see constraints:</div>
+            <div class="legend-item"><span>🔑</span> Primary Key</div>
+            <div class="legend-item"><span>🔗</span> Foreign Key</div>
+            <div class="legend-item"><span>⭐</span> Unique</div>
+            <div class="legend-item"><span>🚫</span> Not Null</div>
+            <div class="legend-item"><span>🔢</span> Auto Increment</div>
           </div>
         </div>
       </div>

@@ -64,5 +64,6 @@
   *ngIf="isModalOpen"
   [isEditMode]="isEditMode"
   [projectToEdit]="selectedProject"
-  (modalClosed)="closeModal()">
+  (modalClosed)="closeModal()"
+  (projectCreated)="onProjectCreated($event)">
 </app-project-modal>

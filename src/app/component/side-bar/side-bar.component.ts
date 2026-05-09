@@ -116,6 +116,10 @@ export class SideBarComponent implements OnInit, OnDestroy {
     this.buildProjectList();
   }
 
+  onProjectCreated(projectId: string): void {
+    this.loadProject(projectId);
+  }
+
   setHoveredProject(projectId: string | null): void {
     this.hoveredProjectId = projectId;
   }

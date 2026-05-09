@@ -148,7 +148,7 @@
       
       <div class="form-group">
         <label for="memberRole">Role</label>
-        <select id="memberRole" class="form-control" [(ngModel)]="newMemberRole">
+        <select id="memberRole" class="form-control role-select" [(ngModel)]="newMemberRole">
           <option value="EDITOR">Editor</option>
           <option value="VIEWER">Viewer</option>
         </select>
@@ -191,7 +191,7 @@
       
       <div class="form-group">
         <label for="editMemberRole">Role</label>
-        <select id="editMemberRole" class="form-control" [(ngModel)]="editMemberRole">
+        <select id="editMemberRole" class="form-control role-select" [(ngModel)]="editMemberRole">
           <option value="OWNER">Owner</option>
           <option value="EDITOR">Editor</option>
           <option value="VIEWER">Viewer</option>

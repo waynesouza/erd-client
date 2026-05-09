@@ -197,11 +197,20 @@ $primary-color: #3b82f6;
 
     th {
       padding: 16px 12px;
-      text-align: left;
       font-weight: 600;
       color: $text-color;
       font-size: 14px;
       border-bottom: 1px solid $border-color;
+      
+      &:first-child,
+      &:nth-child(2),
+      &:last-child {
+        text-align: left;
+      }
+      
+      &:not(:first-child):not(:nth-child(2)):not(:last-child) {
+        text-align: center;
+      }
     }
   }
 
@@ -215,7 +224,19 @@ $primary-color: #3b82f6;
 
       td {
         padding: 12px;
-        vertical-align: middle;
+        vertical-align: top;
+        min-height: 60px; // Fixed minimum height for consistent alignment
+        position: relative;
+        
+        &:first-child,
+        &:nth-child(2),
+        &:nth-child(7) {
+          text-align: left;
+        }
+        
+        &:not(:first-child):not(:nth-child(2)):not(:nth-child(7)) {
+          text-align: center;
+        }
 
         .form-control,
         select {
@@ -231,16 +252,32 @@ $primary-color: #3b82f6;
           }
         }
 
+        .input-with-validation {
+          min-height: 46px; // Fixed height to accommodate input + error message
+          
+          .form-control {
+            margin-bottom: 0;
+          }
+          
+          .text-danger {
+            margin-top: 2px;
+          }
+        }
+
         input[type="checkbox"] {
           width: 18px;
           height: 18px;
           accent-color: $accent-color;
+          display: block;
+          margin: 0 auto;
         }
 
         .btn {
           @include button-danger;
           padding: 6px 10px;
           font-size: 12px;
+          display: block;
+          margin: 0 auto;
 
           i {
             font-size: 14px;
@@ -314,8 +351,11 @@ $primary-color: #3b82f6;
 
 .text-danger {
   color: $danger-color;
-  font-size: 12px;
-  margin-top: 4px;
+  font-size: 11px;
+  margin-top: 2px;
+  line-height: 1.2;
+  display: block;
+  height: 14px; // Fixed height to prevent layout shifts
 }
 
 

@@ -439,26 +439,22 @@ export class ProjectModalComponent implements OnInit {
 
     this.projectService.createProject(this.newProject).subscribe({
       next: (project: any) => {
-        if (project && project.id) {
-          const projectId = project.id;
-          const diagram = {
-            projectId: projectId
-          };
-          this.diagramService.createDiagram(diagram).subscribe({
-            next: () => {
-              this.projectCreated.emit(projectId);
-              this.closeModal();
-            },
-            error: (error: any) => {
-              console.error('Error creating diagram:', error);
-              this.projectCreated.emit(projectId);
-              this.closeModal();
-              alert('Project created successfully, but there was an issue creating the diagram. You can still use the project.');
-            }
-          });
-        } else {
+        if (!project?.id) {
           console.error('No project ID from project creation response');
+          alert('Failed to create project. Please try again.');
+          return;
         }
+
+        const projectId = project.id;
+
+        this.projectCreated.emit(projectId);
+        this.closeModal();
+
+        this.diagramService.createDiagram({ projectId }).subscribe({
+          error: (error: any) => {
+            console.error('Error creating diagram:', error);
+          }
+        });
       },
       error: (error: any) => {
         console.error('Error creating project:', error);

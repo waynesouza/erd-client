@@ -16,6 +16,7 @@ import { Project } from '../model/project.model';
 import { StorageService } from '../service/storage.service';
 import { AuthResponseModel } from '../model/auth-response.model';
 import { SqlValidationService, ValidationResult } from '../service/sql-validation.service';
+import { environment } from '../../environments/environment';
 
 const $ = go.GraphObject.make;
 
@@ -52,6 +53,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
   public diagram: go.Diagram = null;
 
   private stompClient!: Client;
+  private stompSubscriptions: any[] = [];
 
   constructor(
     private diagramService: DiagramService,
@@ -68,7 +70,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // WebSocket configuration using @stomp/stompjs
     this.stompClient = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/api/send'),
+      webSocketFactory: () => new SockJS(environment.wsUrl),
       connectHeaders: {},
       debug: (str: string) => {
         console.log('STOMP Debug:', str);
@@ -80,16 +82,9 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     this.stompClient.onConnect = (frame: any) => {
       console.log('Connected: ' + frame);
-      this.stompClient.subscribe('/topic/receive', (message: any) => {
-        console.log('Received message from server:', message);
-        this.receiveMessageAndRemakeDiagram(message);
-      });
-
-      // Subscribe to collaboration posts
-      this.stompClient.subscribe('/topic/collaboration', (message: any) => {
-        const collaborationMessage: CollaborationMessage = JSON.parse(message.body);
-        this.collaborationService.processCollaborationMessage(collaborationMessage);
-      });
+      if (this.projectId) {
+        this.subscribeToProjectTopics(this.projectId);
+      }
     };
 
     this.stompClient.onStompError = (frame: any) => {
@@ -105,6 +100,9 @@ export class DiagramComponent implements OnInit, OnDestroy {
         this.projectId = projectId;
         this.loadProjectData(projectId);
         this.loadDiagramData(projectId);
+        if (this.stompClient && this.stompClient.connected) {
+          this.subscribeToProjectTopics(projectId);
+        }
       } else {
         this.clearProjectData();
       }
@@ -120,6 +118,29 @@ export class DiagramComponent implements OnInit, OnDestroy {
         this.refreshDiagramBindings();
       }, 100);
     });
+  }
+
+  private subscribeToProjectTopics(projectId: string): void {
+    this.stompSubscriptions.forEach(sub => sub.unsubscribe());
+    this.stompSubscriptions = [];
+
+    const diagramSub = this.stompClient.subscribe(
+      `/topic/diagram/${projectId}`,
+      (message: any) => {
+        console.log('Received diagram update:', message);
+        this.receiveMessageAndRemakeDiagram(message);
+      }
+    );
+
+    const collabSub = this.stompClient.subscribe(
+      `/topic/collaboration/${projectId}`,
+      (message: any) => {
+        const collaborationMessage: CollaborationMessage = JSON.parse(message.body);
+        this.collaborationService.processCollaborationMessage(collaborationMessage);
+      }
+    );
+
+    this.stompSubscriptions.push(diagramSub, collabSub);
   }
 
   private loadProjectData(projectId: string): void {
@@ -288,6 +309,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stompSubscriptions.forEach(sub => sub.unsubscribe());
     if (this.diagram) {
       this.diagram.div = null;
       // @ts-ignore

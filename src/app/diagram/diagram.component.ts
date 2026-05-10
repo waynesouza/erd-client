@@ -17,6 +17,8 @@ import { StorageService } from '../service/storage.service';
 import { AuthResponseModel } from '../model/auth-response.model';
 import { SqlValidationService, ValidationResult } from '../service/sql-validation.service';
 import { environment } from '../../environments/environment';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 
 const $ = go.GraphObject.make;
 
@@ -54,6 +56,9 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
   private stompClient!: Client;
   private stompSubscriptions: any[] = [];
+  private changeSubject = new Subject<void>();
+  private autoSaveSubscription!: Subscription;
+  private isUpdatingFromServer = false;
 
   constructor(
     private diagramService: DiagramService,
@@ -118,6 +123,10 @@ export class DiagramComponent implements OnInit, OnDestroy {
         this.refreshDiagramBindings();
       }, 100);
     });
+
+    this.autoSaveSubscription = this.changeSubject.pipe(
+      debounceTime(1500)
+    ).subscribe(() => this.sendToServer());
   }
 
   private subscribeToProjectTopics(projectId: string): void {
@@ -295,10 +304,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   private setupDiagram(): void {
+    this.isUpdatingFromServer = true;
     this.initializeDiagram();
     if (this.entities.length > 0 || this.relationships.length > 0) {
       this.remakeDiagram();
     }
+    this.isUpdatingFromServer = false;
   }
 
   private setupEmptyDiagram(): void {
@@ -309,6 +320,8 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.autoSaveSubscription?.unsubscribe();
+    this.changeSubject.complete();
     this.stompSubscriptions.forEach(sub => sub.unsubscribe());
     if (this.diagram) {
       this.diagram.div = null;
@@ -642,6 +655,13 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
       go.CommandHandler.prototype.deleteSelection.call(this.diagram.commandHandler);
     };
+
+    this.diagram.addDiagramListener("Modified", () => {
+      if (!this.isUpdatingFromServer && this.projectId) {
+        this.changeSubject.next();
+        this.diagram.isModified = false;
+      }
+    });
   }
 
   toggleDarkMode(): void {
@@ -1421,6 +1441,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   receiveMessageAndRemakeDiagram(message: any): void {
+    this.isUpdatingFromServer = true;
     const data = JSON.parse(message.body);
     this.locations = data.nodeDataArray.map((entity: EntityModel) => {
       return new go.Point(Number(entity.location.x), Number(entity.location.y));
@@ -1428,6 +1449,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
     this.entities = data.nodeDataArray;
     this.relationships = data.linkDataArray;
     this.remakeDiagram();
+    this.isUpdatingFromServer = false;
   }
 
   // Entity editor modal

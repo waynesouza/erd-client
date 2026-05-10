@@ -341,13 +341,15 @@ export class DiagramComponent implements OnInit, OnDestroy {
     this.diagram.model = new go.GraphLinksModel({nodeDataArray: this.entities});
 
     // Helper functions for GoJS bindings
-    const getDataTypeIcon = (dataType: string): string => {
-      const iconMap: { [key: string]: string } = {
-        'INTEGER': '🔢', 'BIGINT': '🔢', 'DECIMAL': '💰', 'NUMERIC': '💰',
-        'VARCHAR': '📝', 'CHAR': '🔤', 'TEXT': '📄', 'BOOLEAN': '☑️',
-        'DATE': '📅', 'DATETIME': '🗓️', 'TIMESTAMP': '⏰', 'TIME': '🕐', 'UUID': '🆔'
+    const getDataTypeColor = (dataType: string): string => {
+      const colorMap: { [key: string]: string } = {
+        'INTEGER': '#3b82f6', 'BIGINT': '#3b82f6', 'DECIMAL': '#3b82f6', 'NUMERIC': '#3b82f6',
+        'VARCHAR': '#10b981', 'CHAR': '#10b981', 'TEXT': '#10b981',
+        'BOOLEAN': '#8b5cf6',
+        'DATE': '#f59e0b', 'DATETIME': '#f59e0b', 'TIMESTAMP': '#f59e0b', 'TIME': '#f59e0b',
+        'UUID': '#6b7280'
       };
-      return iconMap[dataType] || '⚪';
+      return colorMap[dataType] || '#9ca3af';
     };
 
 
@@ -360,8 +362,8 @@ export class DiagramComponent implements OnInit, OnDestroy {
         defaultAlignment: go.Spot.Left,
         // Add tooltip to the entire attribute row
         toolTip: $("ToolTip",
-          $(go.TextBlock, 
-            { 
+          $(go.TextBlock,
+            {
               margin: 4,
               font: "12px Inter, system-ui, sans-serif"
             },
@@ -372,22 +374,22 @@ export class DiagramComponent implements OnInit, OnDestroy {
               if (attribute.unique && !attribute.pk) constraints.push('Unique');
               if (attribute.autoIncrement) constraints.push('Auto Increment');
               if (!attribute.nullable) constraints.push('Not Null');
-              
+
               const constraintText = constraints.length > 0 ? constraints.join(', ') : 'No constraints';
               return `${attribute.name}\nType: ${attribute.type}\nConstraints: ${constraintText}`;
             })
           )
         )
       },
-      // Data type icon (emoji)
-      $(go.TextBlock,
+      // Data type color indicator
+      $(go.Shape, "Circle",
         {
-          font: "14px Inter, system-ui, sans-serif",
-          margin: new go.Margin(0, 6, 0, 0),
-          width: 18,
-          textAlign: "center"
+          width: 10,
+          height: 10,
+          strokeWidth: 0,
+          margin: new go.Margin(0, 6, 0, 2)
         },
-        new go.Binding("text", "type", getDataTypeIcon)
+        new go.Binding("fill", "type", getDataTypeColor)
       ),
       // Attribute name
       $(go.TextBlock,
@@ -402,6 +404,16 @@ export class DiagramComponent implements OnInit, OnDestroy {
         new go.Binding("font", "pk", (pk) =>
           pk ? "bold 14px Inter, system-ui, sans-serif" : "14px Inter, system-ui, sans-serif"
         )
+      ),
+      // PK label
+      $(go.TextBlock,
+        {
+          font: "bold 9px Inter, system-ui, sans-serif",
+          stroke: "#f59e0b",
+          margin: new go.Margin(0, 0, 0, 4)
+        },
+        new go.Binding("text", "pk", (pk: boolean) => pk ? "PK" : ""),
+        new go.Binding("visible", "pk")
       ),
       // Data type
       $(go.TextBlock,
@@ -783,7 +795,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     this.selectedRelationshipType = type;
     this.selectedEntities = [];
-    
+
     // Show user feedback
     console.log(`Relationship type '${type}' selected. Click on two tables to create relationship.`);
   }
@@ -945,7 +957,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   removeRelationship(id: string): void {
     console.log(`Removing relationship: ${id}`);
-    
+
     const relationshipIndex: number = this.relationships.findIndex(r => r.id === id);
     if (relationshipIndex === -1) {
       console.warn(`Relationship with ID ${id} not found`);
@@ -969,7 +981,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     // Update the diagram
     this.remakeDiagram();
-    
+
     console.log(`✅ Relationship ${id} removed successfully`);
   }
 
@@ -979,7 +991,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private processRelationshipRemoval(relationship: any): void {
     const relationshipType = relationship.text;
-    
+
     switch (relationshipType) {
       case '1:1':
         this.removeOneToOneRelationship(relationship);
@@ -1004,16 +1016,16 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private removeOneToOneRelationship(relationship: any): void {
     console.log(`🔗 Removing 1:1 relationship between ${relationship.from} and ${relationship.to}`);
-    
+
     // In 1:1 relationships, FK can be in either entity - check both directions
     const fromEntity = this.findEntityByKey(relationship.from);
     const toEntity = this.findEntityByKey(relationship.to);
-    
+
     if (!fromEntity) {
       console.error(`❌ From entity not found: ${relationship.from}`);
       return;
     }
-    
+
     if (!toEntity) {
       console.error(`❌ To entity not found: ${relationship.to}`);
       return;
@@ -1021,12 +1033,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     // Try to remove FK from "from" entity that references "to" entity
     let fkRemoved = this.removeForeignKeyFromEntity(fromEntity, relationship.to);
-    
+
     // If not found, try the reverse direction
     if (!fkRemoved) {
       fkRemoved = this.removeForeignKeyFromEntity(toEntity, relationship.from);
     }
-    
+
     if (!fkRemoved) {
       console.warn(`⚠️ No FK found for 1:1 relationship between ${relationship.from} and ${relationship.to}`);
     }
@@ -1038,16 +1050,16 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private removeOneToManyRelationship(relationship: any): void {
     console.log(`🔗 Removing 1:N relationship between ${relationship.from} and ${relationship.to}`);
-    
+
     // In 1:N relationships, FK can be in either entity - check both directions
     const fromEntity = this.findEntityByKey(relationship.from);
     const toEntity = this.findEntityByKey(relationship.to);
-    
+
     if (!fromEntity) {
       console.error(`❌ From entity not found: ${relationship.from}`);
       return;
     }
-    
+
     if (!toEntity) {
       console.error(`❌ To entity not found: ${relationship.to}`);
       return;
@@ -1055,12 +1067,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     // Try to remove FK from "from" entity that references "to" entity
     let fkRemoved = this.removeForeignKeyFromEntity(fromEntity, relationship.to);
-    
+
     // If not found, try the reverse direction
     if (!fkRemoved) {
       fkRemoved = this.removeForeignKeyFromEntity(toEntity, relationship.from);
     }
-    
+
     if (!fkRemoved) {
       console.warn(`⚠️ No FK found for 1:N relationship between ${relationship.from} and ${relationship.to}`);
     }
@@ -1072,16 +1084,16 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private removeManyToOneRelationship(relationship: any): void {
     console.log(`🔗 Removing N:1 relationship between ${relationship.from} and ${relationship.to}`);
-    
+
     // In N:1 relationships, the FK is always in the "from" entity (many side)
     const manyEntity = this.findEntityByKey(relationship.from);
     const oneEntity = this.findEntityByKey(relationship.to);
-    
+
     if (!manyEntity) {
       console.error(`❌ Many entity not found: ${relationship.from}`);
       return;
     }
-    
+
     if (!oneEntity) {
       console.error(`❌ One entity not found: ${relationship.to}`);
       return;
@@ -1089,13 +1101,13 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     // Remove FK from "many" entity that references "one" entity
     console.log(`🔍 Looking for FK in ${manyEntity.key} that references ${oneEntity.key}`);
-    
+
     // List all FKs in the many entity for debugging
     const allFKs = manyEntity.items.filter(item => item.fk === true);
     console.log(`📋 All FKs in ${manyEntity.key}:`, allFKs.map(fk => `${fk.name} (fk: ${fk.fk})`));
-    
+
     const fkRemoved = this.removeForeignKeyFromEntity(manyEntity, relationship.to);
-    
+
     if (!fkRemoved) {
       console.warn(`⚠️ No FK found for N:1 relationship between ${relationship.from} and ${relationship.to}`);
       // Try a more aggressive search
@@ -1117,20 +1129,20 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private removeManyToManyRelationship(relationship: any): void {
     console.log(`🔗 Removing N:N relationship between ${relationship.from} and ${relationship.to}`);
-    
+
     // For N:N relationships, we need to check if either entity is an intermediary
     // and clean up appropriately
     const fromEntity = this.findEntityByKey(relationship.from);
     const toEntity = this.findEntityByKey(relationship.to);
-    
+
     if (fromEntity && this.isIntermediaryEntity(fromEntity)) {
       console.log(`📊 ${relationship.from} is an intermediary entity - marking for cleanup`);
     }
-    
+
     if (toEntity && this.isIntermediaryEntity(toEntity)) {
       console.log(`📊 ${relationship.to} is an intermediary entity - marking for cleanup`);
     }
-    
+
     // The cleanup will happen in cleanupOrphanedIntermediaryEntities()
     console.log(`🔗 N:N relationship marked for cleanup - intermediary entities will be removed automatically`);
   }
@@ -1143,11 +1155,11 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private removeForeignKeyFromEntity(entity: EntityModel, referencedEntityKey: string): boolean {
     console.log(`🔍 Searching for FK in ${entity.key} that references ${referencedEntityKey}`);
-    
+
     // Find all foreign keys in the entity (items with fk: true)
     const foreignKeys = entity.items.filter(item => item.fk === true);
     console.log(`📋 Found ${foreignKeys.length} foreign keys in ${entity.key}:`, foreignKeys.map(fk => fk.name));
-    
+
     if (foreignKeys.length === 0) {
       console.log(`⚠️ No foreign keys found in ${entity.key}`);
       return false;
@@ -1157,7 +1169,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
     // Handle both singular and plural forms
     const entitySingular = this.getSingularForm(referencedEntityKey);
     console.log(`🔤 Entity forms: "${referencedEntityKey}" → singular: "${entitySingular}"`);
-    
+
     const possibleFKNames = [
       `${referencedEntityKey}_id`,
       `${referencedEntityKey}Id`,
@@ -1174,10 +1186,10 @@ export class DiagramComponent implements OnInit, OnDestroy {
     // First, try exact matches with common naming patterns
     for (const fkName of possibleFKNames) {
       console.log(`🔍 Checking pattern: "${fkName}"`);
-      const fkIndex = entity.items.findIndex(item => 
+      const fkIndex = entity.items.findIndex(item =>
         item.fk === true && item.name.toLowerCase() === fkName.toLowerCase()
       );
-      
+
       if (fkIndex !== -1) {
         const removedFK = entity.items.splice(fkIndex, 1)[0];
         console.log(`🗑️ FK removed by exact match: ${removedFK.name} from entity ${entity.key}`);
@@ -1196,7 +1208,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
       const itemName = item.name.toLowerCase();
       const entityName = referencedEntityKey.toLowerCase();
       const singularName = entitySingular.toLowerCase();
-      
+
       return itemName.includes(entityName) || itemName.includes(singularName);
     });
 
@@ -1230,18 +1242,18 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private cleanupOrphanedIntermediaryEntities(): void {
     console.log(`🧹 Cleaning up orphaned intermediary entities...`);
-    
-    const intermediaryEntities = this.entities.filter(entity => 
+
+    const intermediaryEntities = this.entities.filter(entity =>
       this.isIntermediaryEntity(entity)
     );
 
     console.log(`📊 Found ${intermediaryEntities.length} intermediary entities for verification`);
-    
+
     let removedCount = 0;
     const entitiesToRemove: string[] = [];
 
     for (const intermediaryEntity of intermediaryEntities) {
-      const relatedRelationships = this.relationships.filter(rel => 
+      const relatedRelationships = this.relationships.filter(rel =>
         rel.from === intermediaryEntity.key || rel.to === intermediaryEntity.key
       );
 
@@ -1253,14 +1265,14 @@ export class DiagramComponent implements OnInit, OnDestroy {
         entitiesToRemove.push(intermediaryEntity.key);
       }
     }
-    
+
     // Remove marked entities and their relationships
     for (const entityKey of entitiesToRemove) {
       // Remove all relationships from this entity
-      this.relationships = this.relationships.filter(rel => 
+      this.relationships = this.relationships.filter(rel =>
         rel.from !== entityKey && rel.to !== entityKey
       );
-      
+
       // Remove the intermediary entity
       const entityIndex = this.entities.findIndex(e => e.key === entityKey);
       if (entityIndex !== -1) {
@@ -1269,7 +1281,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
         console.log(`✅ Intermediary entity ${entityKey} removed`);
       }
     }
-    
+
     if (removedCount > 0) {
       console.log(`🧹 Cleanup completed: ${removedCount} orphaned intermediary entities removed`);
     } else {
@@ -1296,7 +1308,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
     }
 
     // Check if all attributes are FKs (characteristic of intermediary entity)
-    const allAttributesAreFKs = entity.items.length > 0 && 
+    const allAttributesAreFKs = entity.items.length > 0 &&
       entity.items.every(item => item.fk === true);
 
     // Check if it has exactly 2 FKs (common pattern for N:N)
@@ -1311,47 +1323,47 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private verifyRelationshipRemoval(relationship: any): void {
     console.log(`🔍 Verifying removal of relationship between ${relationship.from} and ${relationship.to}`);
-    
+
     const fromEntity = this.findEntityByKey(relationship.from);
     const toEntity = this.findEntityByKey(relationship.to);
-    
+
     // Check for orphaned FKs that might reference the relationship
     if (fromEntity) {
       const remainingFKs = fromEntity.items.filter(item => item.fk === true);
-      const orphanedFKs = remainingFKs.filter(item => 
+      const orphanedFKs = remainingFKs.filter(item =>
         item.name.toLowerCase().includes(relationship.to.toLowerCase()) ||
         item.name.toLowerCase().includes(`${relationship.to.toLowerCase()}_id`)
       );
-      
+
       if (orphanedFKs.length > 0) {
-        console.warn(`⚠️ Found ${orphanedFKs.length} potentially orphaned FKs in ${fromEntity.key}:`, 
+        console.warn(`⚠️ Found ${orphanedFKs.length} potentially orphaned FKs in ${fromEntity.key}:`,
           orphanedFKs.map(fk => fk.name));
       } else if (remainingFKs.length > 0) {
-        console.log(`✅ ${fromEntity.key} has ${remainingFKs.length} remaining FKs (not related to removed relationship):`, 
+        console.log(`✅ ${fromEntity.key} has ${remainingFKs.length} remaining FKs (not related to removed relationship):`,
           remainingFKs.map(fk => fk.name));
       } else {
         console.log(`✅ ${fromEntity.key} has no remaining FKs`);
       }
     }
-    
+
     if (toEntity) {
       const remainingFKs = toEntity.items.filter(item => item.fk === true);
-      const orphanedFKs = remainingFKs.filter(item => 
+      const orphanedFKs = remainingFKs.filter(item =>
         item.name.toLowerCase().includes(relationship.from.toLowerCase()) ||
         item.name.toLowerCase().includes(`${relationship.from.toLowerCase()}_id`)
       );
-      
+
       if (orphanedFKs.length > 0) {
-        console.warn(`⚠️ Found ${orphanedFKs.length} potentially orphaned FKs in ${toEntity.key}:`, 
+        console.warn(`⚠️ Found ${orphanedFKs.length} potentially orphaned FKs in ${toEntity.key}:`,
           orphanedFKs.map(fk => fk.name));
       } else if (remainingFKs.length > 0) {
-        console.log(`✅ ${toEntity.key} has ${remainingFKs.length} remaining FKs (not related to removed relationship):`, 
+        console.log(`✅ ${toEntity.key} has ${remainingFKs.length} remaining FKs (not related to removed relationship):`,
           remainingFKs.map(fk => fk.name));
       } else {
         console.log(`✅ ${toEntity.key} has no remaining FKs`);
       }
     }
-    
+
     console.log(`✅ Relationship removal verification completed`);
   }
 
@@ -1362,7 +1374,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
    */
   private getSingularForm(word: string): string {
     const lowerWord = word.toLowerCase();
-    
+
     // Handle common plural patterns
     if (lowerWord.endsWith('ies')) {
       return word.slice(0, -3) + 'y';
@@ -1371,7 +1383,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
     } else if (lowerWord.endsWith('s') && !lowerWord.endsWith('ss')) {
       return word.slice(0, -1);
     }
-    
+
     // If no plural pattern found, return as-is
     return word;
   }

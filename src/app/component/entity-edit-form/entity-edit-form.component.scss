@@ -201,13 +201,13 @@ $primary-color: #3b82f6;
       color: $text-color;
       font-size: 14px;
       border-bottom: 1px solid $border-color;
-      
+
       &:first-child,
       &:nth-child(2),
       &:last-child {
         text-align: left;
       }
-      
+
       &:not(:first-child):not(:nth-child(2)):not(:last-child) {
         text-align: center;
       }
@@ -227,13 +227,13 @@ $primary-color: #3b82f6;
         vertical-align: top;
         min-height: 60px; // Fixed minimum height for consistent alignment
         position: relative;
-        
+
         &:first-child,
         &:nth-child(2),
         &:nth-child(7) {
           text-align: left;
         }
-        
+
         &:not(:first-child):not(:nth-child(2)):not(:nth-child(7)) {
           text-align: center;
         }
@@ -254,11 +254,11 @@ $primary-color: #3b82f6;
 
         .input-with-validation {
           min-height: 46px; // Fixed height to accommodate input + error message
-          
+
           .form-control {
             margin-bottom: 0;
           }
-          
+
           .text-danger {
             margin-top: 2px;
           }
@@ -328,26 +328,6 @@ $primary-color: #3b82f6;
   }
 }
 
-// Validation styles
-.validation-indicator {
-  margin-left: 8px;
-  
-  &.valid i {
-    color: $success-color;
-  }
-  
-  &.invalid i {
-    color: $danger-color;
-  }
-}
-
-.has-error {
-  background-color: rgba($danger-color, 0.05);
-  
-  .form-control {
-    border-color: $danger-color;
-  }
-}
 
 .text-danger {
   color: $danger-color;
@@ -362,7 +342,7 @@ $primary-color: #3b82f6;
 
 .is-valid {
   border-color: $success-color;
-  
+
   &:focus {
     border-color: $success-color;
     box-shadow: 0 0 0 3px rgba($success-color, 0.1);
@@ -371,7 +351,7 @@ $primary-color: #3b82f6;
 
 .is-invalid {
   border-color: $danger-color;
-  
+
   &:focus {
     border-color: $danger-color;
     box-shadow: 0 0 0 3px rgba($danger-color, 0.1);

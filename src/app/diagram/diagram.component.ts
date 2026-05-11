@@ -15,7 +15,6 @@ import { ProjectService } from '../service/project.service';
 import { Project } from '../model/project.model';
 import { StorageService } from '../service/storage.service';
 import { AuthResponseModel } from '../model/auth-response.model';
-import { SqlValidationService, ValidationResult } from '../service/sql-validation.service';
 import { environment } from '../../environments/environment';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -66,8 +65,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
     private ddlService: DdlService,
     private collaborationService: CollaborationService,
     private projectService: ProjectService,
-    private storageService: StorageService,
-    private sqlValidationService: SqlValidationService
+    private storageService: StorageService
   ) {
     this.currentUser = this.storageService.getUser();
   }
@@ -423,7 +421,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
         {
           font: "bold 9px Inter, system-ui, sans-serif",
           stroke: "#f59e0b",
-          margin: new go.Margin(0, 0, 0, 4)
+          margin: new go.Margin(0, 4, 0, 4)
         },
         new go.Binding("text", "pk", (pk: boolean) => pk ? "PK" : ""),
         new go.Binding("visible", "pk")
@@ -491,10 +489,11 @@ export class DiagramComponent implements OnInit, OnDestroy {
             // Table icon
             $(go.TextBlock,
               {
-                font: "16px Inter, system-ui, sans-serif",
-                margin: new go.Margin(10, 6, 10, 10),
-                text: "🗃️"
-              }
+                font: "16px bootstrap-icons",
+                margin: new go.Margin(12, 6, 8, 10),
+                text: ""
+              },
+              new go.Binding("stroke", "", () => this.darkMode ? "#f3f4f6" : "#1f2937")
             ),
             // Entity name
             $(go.TextBlock,
@@ -669,15 +668,13 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   addEntity(): void {
-    // Check if the user can edit the diagram
     if (!this.canEdit) {
       this.showPermissionDeniedMessage();
       return;
     }
 
-    // Validate before adding new entity if there are many errors
-    if (!this.validateNewEntity()) {
-      return; // Do not add if user chose to view report
+    if (!this.diagram) {
+      this.initializeDiagram();
     }
 
     const newEntity: EntityModel = {
@@ -732,23 +729,6 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   handleSave(entity: any): void {
-    // Validate entity before saving
-    const validationResult = this.sqlValidationService.validateEntity(entity, this.entities);
-
-    if (!validationResult.isValid) {
-      const message = this.sqlValidationService.formatValidationMessages(validationResult);
-      alert(message);
-      return; // Do not save if there are errors
-    }
-
-    // Show warnings if any (but allow to continue)
-    if (validationResult.warnings.length > 0) {
-      const warningMessage = `⚠️ WARNINGS:\n${validationResult.warnings.join('\n')}\n\nDo you want to continue anyway?`;
-      if (!confirm(warningMessage)) {
-        return;
-      }
-    }
-
     this.showTableEditor = false;
     const index: number = this.entities.findIndex((e: EntityModel) : boolean => e.id === entity.id);
 
@@ -771,8 +751,6 @@ export class DiagramComponent implements OnInit, OnDestroy {
       linkDataArray: this.relationships
     });
 
-    // Validate the complete diagram after update
-    this.validateDiagram();
   }
 
   handleRemove(id: string): void {
@@ -1661,92 +1639,5 @@ export class DiagramComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Complete diagram validation
-  validateDiagram(): void {
-    const validationResult: ValidationResult = this.sqlValidationService.validateDiagram(this.entities);
-
-    // Update visual validation status
-    this.updateValidationStatus(validationResult);
-
-    // Log for debugging (optional)
-    if (!validationResult.isValid) {
-      console.warn('Diagram validation errors:', validationResult.errors);
-    }
-
-    if (validationResult.warnings.length > 0) {
-      console.info('Diagram validation warnings:', validationResult.warnings);
-    }
-  }
-
-  // Update visual diagram status based on validation
-  private updateValidationStatus(validationResult: ValidationResult): void {
-    this.entities.forEach(entity => {
-      const node = this.diagram.findNodeForKey(entity.id);
-      if (node) {
-        const entityValidation = this.sqlValidationService.validateEntity(entity, this.entities);
-
-        // Apply visual styles based on validation
-        const mainShapeObj = node.findObject('MAIN_SHAPE');
-        const mainShape = mainShapeObj as go.Shape;
-
-        if (mainShape && mainShape instanceof go.Shape) {
-          if (!entityValidation.isValid) {
-            // Entity with errors - red border
-            mainShape.stroke = '#dc2626';
-            mainShape.strokeWidth = 2;
-          } else if (entityValidation.warnings.length > 0) {
-            // Entity with warnings - orange border
-            mainShape.stroke = '#f59e0b';
-            mainShape.strokeWidth = 2;
-          } else {
-            // Valid Entity - Default Edge
-            mainShape.stroke = '#6b7280';
-            mainShape.strokeWidth = 1;
-          }
-        }
-      }
-    });
-  }
-
-  // Method to show validations in a modal
-  showValidationReport(): void {
-    const validationResult: ValidationResult = this.sqlValidationService.validateDiagram(this.entities);
-
-    if (validationResult.errors.length === 0 && validationResult.warnings.length === 0) {
-      alert('✅ Diagram is valid! No errors or warnings found.');
-      return;
-    }
-
-    const message = this.sqlValidationService.formatValidationMessages(validationResult);
-    alert(message);
-  }
-
-  // Automatic validation when adding new entity
-  validateNewEntity(): boolean {
-    if (this.entities.length === 0) return true;
-
-    const validationResult = this.sqlValidationService.validateDiagram(this.entities);
-
-    // If there are many entities without validation, warn
-    const invalidEntities = this.entities.filter(entity => {
-      const entityValidation = this.sqlValidationService.validateEntity(entity, this.entities);
-      return !entityValidation.isValid;
-    });
-
-    if (invalidEntities.length > 3) {
-      const proceed = confirm(
-        `⚠️ You have ${invalidEntities.length} entities with validation errors.\n\n` +
-        'Adding more entities without fixing existing issues might create more problems.\n\n' +
-        'Do you want to see the validation report first?'
-      );
-
-      if (proceed) {
-        this.showValidationReport();
-        return false;
-      }
-    }
-
-    return true;
-  }
-
 }
+

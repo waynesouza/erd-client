@@ -3,8 +3,6 @@ import { EntityModel } from '../../model/entity.model';
 import { Point } from 'gojs';
 import { DataType } from "../../model/enum/datatype.enum";
 import { AttributeModel } from '../../model/attribute.model';
-import { SqlValidationService, ValidationResult } from '../../service/sql-validation.service';
-
 @Component({
   selector: 'app-entity-edit-form',
   templateUrl: './entity-edit-form.component.html',
@@ -23,7 +21,6 @@ export class EntityEditFormComponent {
   @Output() close: EventEmitter<void> = new EventEmitter<void>();
   dataTypes: DataType[] = Object.values(DataType);
   
-  constructor(private sqlValidationService: SqlValidationService) {}
 
   addAttribute(): void {
     const newAttribute: AttributeModel = {
@@ -47,32 +44,8 @@ export class EntityEditFormComponent {
   }
 
   updateEntity(): void {
-    if (this.validateEntity()) {
-      this.entityUpdated.emit(this.entity);
-      this.closeModal();
-    }
-  }
-
-  private validateEntity(): boolean {
-    // Usar o serviço de validação SQL completo
-    const validationResult: ValidationResult = this.sqlValidationService.validateEntity(this.entity);
-    
-    if (!validationResult.isValid) {
-      // Mostrar erros em um alert formatado
-      const message = this.sqlValidationService.formatValidationMessages(validationResult);
-      alert(message);
-      return false;
-    }
-
-    // Mostrar warnings se existirem (mas permitir continuar)
-    if (validationResult.warnings.length > 0) {
-      const warningMessage = `⚠️ WARNINGS:\n${validationResult.warnings.join('\n')}\n\nDo you want to continue anyway?`;
-      if (!confirm(warningMessage)) {
-        return false;
-      }
-    }
-
-    return true;
+    this.entityUpdated.emit(this.entity);
+    this.closeModal();
   }
 
   closeModal(): void {

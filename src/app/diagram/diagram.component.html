@@ -49,11 +49,6 @@
                 title="Many to Many (N:N) - Multiple records relate to multiple records">n:n</button>
       </div>
       <div class="tool-group">
-        <button class="tool-button save-btn" type="button" (click)="sendToServer()" title="Save Diagram to Server">
-          <i class="bi bi-floppy"></i>
-        </button>
-      </div>
-      <div class="tool-group">
         <button class="tool-button export-btn" type="button" (click)="exportDdl()" title="Export SQL DDL Script">
           <i class="bi bi-file-earmark-code"></i>
         </button>
@@ -62,9 +57,6 @@
         </button>
       </div>
       <div class="tool-group">
-        <button class="tool-button validation-button" type="button" (click)="showValidationReport()" title="Validate Database Schema">
-          <i class="bi bi-shield-check"></i>
-        </button>
         <button class="tool-button legend-button" type="button" (click)="showLegend = !showLegend" title="Show/Hide Legend">
           <i class="bi bi-info-circle-fill"></i>
         </button>
@@ -83,11 +75,8 @@
         <button class="tool-button" type="button" (click)="exportDdl()" title="Export DDL">
           <i class="bi bi-download"></i>
         </button>
-        <button class="tool-button validation-button" type="button" (click)="showValidationReport()" title="Validate Diagram">
-          <i class="bi bi-shield-check"></i>
-        </button>
-        <button class="tool-button legend-button" type="button" (click)="showLegend = !showLegend" title="Toggle Legend">
-          <i class="bi bi-info-circle"></i>
+        <button class="tool-button legend-button" type="button" (click)="showLegend = !showLegend" title="Show/Hide Legend">
+          <i class="bi bi-info-circle-fill"></i>
         </button>
       </div>
     </div>
@@ -97,29 +86,41 @@
       
       <!-- Legenda de ícones -->
       <div class="icon-legend" *ngIf="projectId && entities.length > 0 && showLegend">
-        <h6>📋 Legend</h6>
+        <h6>Legend</h6>
         <div class="legend-grid">
           <div class="legend-section">
             <div class="legend-title">Data Types</div>
-            <div class="legend-item"><span>🔢</span> Numbers (INTEGER, BIGINT)</div>
-            <div class="legend-item"><span>💰</span> Decimals (DECIMAL, NUMERIC)</div>
-            <div class="legend-item"><span>📝</span> Text (VARCHAR, CHAR)</div>
-            <div class="legend-item"><span>📄</span> Long Text (TEXT)</div>
-            <div class="legend-item"><span>☑️</span> Boolean</div>
-            <div class="legend-item"><span>📅</span> Date</div>
-            <div class="legend-item"><span>🗓️</span> DateTime</div>
-            <div class="legend-item"><span>⏰</span> Timestamp</div>
-            <div class="legend-item"><span>🆔</span> UUID</div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#3b82f6"></span>
+              <span>Integer / Decimal</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#10b981"></span>
+              <span>Text (VARCHAR, CHAR, TEXT)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#8b5cf6"></span>
+              <span>Boolean</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#f59e0b"></span>
+              <span>Date / Time</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#6b7280"></span>
+              <span>UUID</span>
+            </div>
           </div>
           <div class="legend-section">
-            <div class="legend-title">Attribute Info</div>
-            <div class="legend-item"><span>💡</span> Hover over attributes</div>
-            <div class="legend-item"><span>ℹ️</span> to see constraints:</div>
-            <div class="legend-item"><span>🔑</span> Primary Key</div>
-            <div class="legend-item"><span>🔗</span> Foreign Key</div>
-            <div class="legend-item"><span>⭐</span> Unique</div>
-            <div class="legend-item"><span>🚫</span> Not Null</div>
-            <div class="legend-item"><span>🔢</span> Auto Increment</div>
+            <div class="legend-title">Attributes</div>
+            <div class="legend-item">
+              <span class="legend-pk">PK</span>
+              <span>Primary Key</span>
+            </div>
+            <div class="legend-item">
+              <i class="bi bi-cursor-text legend-icon"></i>
+              <span>Hover to see constraints</span>
+            </div>
           </div>
         </div>
       </div>

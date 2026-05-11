@@ -224,9 +224,7 @@ $primary-color: #3b82f6;
 
       td {
         padding: 12px;
-        vertical-align: top;
-        min-height: 60px; // Fixed minimum height for consistent alignment
-        position: relative;
+        vertical-align: middle;
 
         &:first-child,
         &:nth-child(2),
@@ -253,14 +251,8 @@ $primary-color: #3b82f6;
         }
 
         .input-with-validation {
-          min-height: 46px; // Fixed height to accommodate input + error message
-
           .form-control {
             margin-bottom: 0;
-          }
-
-          .text-danger {
-            margin-top: 2px;
           }
         }
 

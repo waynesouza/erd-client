@@ -4,7 +4,8 @@
   </button>
 
   <div class="logo-space">
-    <!-- Logo will be added here -->
+    <img *ngIf="!isCollapsed" src="assets/logo-erd-studio.png" alt="ERD Studio" class="logo-full">
+    <img *ngIf="isCollapsed" src="assets/logo.png" alt="ERD Studio" class="logo-icon">
   </div>
 
   <div class="sidebar-content">

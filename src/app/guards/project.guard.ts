@@ -21,7 +21,7 @@ export class ProjectGuard implements CanActivate {
     const projectId = route.params['projectId'] || route.params['id'];
 
     if (!projectId) {
-      // Se não há projectId na rota, permite acesso (para rotas gerais)
+      // No projectId in the route — allow access (general routes)
       return of(true);
     }
 
@@ -31,7 +31,7 @@ export class ProjectGuard implements CanActivate {
       return of(false);
     }
 
-    // Verifica se o usuário tem acesso ao projeto
+    // Check if the user has access to this project
     return this.projectService.getProjectsByUserEmail(user.email).pipe(
       map(projects => {
         const hasAccess = projects.some(project => project.id === projectId);

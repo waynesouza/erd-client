@@ -693,7 +693,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
   // Entity editor
   showTableEditorModal(entity: any): void {
-    // Verificar se o usuário pode editar
+    // Guard: user must have edit permission
     if (!this.canEdit) {
       this.showPermissionDeniedMessage();
       return;

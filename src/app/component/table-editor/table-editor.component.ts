@@ -61,13 +61,13 @@ export class TableEditorComponent implements OnInit {
   }
 
   private validateTable(): boolean {
-    // Validar nome da tabela
+    // Validate table name
     if (!this.entity.key.trim()) {
       alert('Table name is required');
       return false;
     }
 
-    // Validar colunas
+    // Validate columns
     if (this.entity.items.length === 0) {
       alert('At least one column is required');
       return false;
@@ -81,7 +81,7 @@ export class TableEditorComponent implements OnInit {
       }
     }
 
-    // Validar chave primária
+    // Validate primary key
     const primaryKeys = this.entity.items.filter(column => column.pk);
     if (primaryKeys.length === 0) {
       alert('At least one primary key is required');

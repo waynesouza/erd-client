@@ -16,9 +16,7 @@ export class SqlValidationService {
 
   constructor() { }
 
-  /**
-   * Valida uma entidade individual
-   */
+  /** Validates a single entity. */
   validateEntity(entity: EntityModel, allEntities: EntityModel[] = []): ValidationResult {
     const result: ValidationResult = {
       isValid: true,
@@ -26,37 +24,35 @@ export class SqlValidationService {
       warnings: []
     };
 
-    // 1. Validação do nome da entidade
+    // 1. Validate entity name
     this.validateEntityName(entity, allEntities, result);
 
-    // 2. Validação de atributos mínimos
+    // 2. Validate minimum attributes
     this.validateMinimumAttributes(entity, result);
 
-    // 3. Validação de Primary Key
+    // 3. Validate Primary Key
     this.validatePrimaryKey(entity, result);
 
-    // 4. Validação de nomes de atributos
+    // 4. Validate attribute names
     this.validateAttributeNames(entity, result);
 
-    // 5. Validação de tipos de dados
+    // 5. Validate data types
     this.validateDataTypes(entity, result);
 
-    // 6. Validação de regras específicas por tipo
+    // 6. Validate type-specific rules
     this.validateTypeSpecificRules(entity, result);
 
-    // 7. Validação de AUTO_INCREMENT
+    // 7. Validate AUTO_INCREMENT
     this.validateAutoIncrement(entity, result);
 
-    // 8. Validação de UNIQUE constraints
+    // 8. Validate UNIQUE constraints
     this.validateUniqueConstraints(entity, result);
 
     result.isValid = result.errors.length === 0;
     return result;
   }
 
-  /**
-   * Valida o diagrama completo
-   */
+  /** Validates the full diagram. */
   validateDiagram(entities: EntityModel[]): ValidationResult {
     const result: ValidationResult = {
       isValid: true,
@@ -64,14 +60,14 @@ export class SqlValidationService {
       warnings: []
     };
 
-    // 1. Validação de nomes únicos de entidades
+    // 1. Validate unique entity names
     this.validateUniqueEntityNames(entities, result);
 
-    // 2. Validação individual de cada entidade
+    // 2. Validate each entity individually
     entities.forEach((entity, index) => {
       const entityResult = this.validateEntity(entity, entities);
 
-      // Prefixar erros com nome da entidade
+      // Prefix errors with entity name
       entityResult.errors.forEach(error => {
         result.errors.push(`[${entity.key || `Entity ${index + 1}`}] ${error}`);
       });
@@ -81,7 +77,7 @@ export class SqlValidationService {
       });
     });
 
-    // 3. Validação de relacionamentos (se necessário)
+    // 3. Validate relationships
     this.validateRelationships(entities, result);
 
     result.isValid = result.errors.length === 0;
@@ -89,7 +85,7 @@ export class SqlValidationService {
   }
 
   private validateEntityName(entity: EntityModel, allEntities: EntityModel[], result: ValidationResult): void {
-    // Nome obrigatório
+    // Required
     if (!entity.key || entity.key.trim() === '') {
       result.errors.push('Entity name is required');
       return;
@@ -97,12 +93,12 @@ export class SqlValidationService {
 
     const entityName = entity.key.trim();
 
-    // Validação de caracteres SQL válidos
+    // Validate SQL-valid characters
     if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityName)) {
       result.errors.push('Entity name must start with a letter and contain only letters, numbers, and underscores');
     }
 
-    // Tamanho do nome
+    // Name length
     if (entityName.length > 64) {
       result.errors.push('Entity name must be 64 characters or less');
     }
@@ -111,7 +107,7 @@ export class SqlValidationService {
       result.errors.push('Entity name must be at least 2 characters long');
     }
 
-    // Palavras reservadas SQL
+    // SQL reserved words
     const reservedWords = [
       'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER',
       'TABLE', 'INDEX', 'VIEW', 'TRIGGER', 'PROCEDURE', 'FUNCTION', 'DATABASE', 'SCHEMA',
@@ -124,7 +120,7 @@ export class SqlValidationService {
       result.errors.push(`"${entityName}" is a reserved SQL keyword and cannot be used as entity name`);
     }
 
-    // Verificação de nomes duplicados
+    // Check for duplicate names
     const duplicates = allEntities.filter(e =>
       e.id !== entity.id &&
       e.key &&
@@ -151,7 +147,7 @@ export class SqlValidationService {
       result.errors.push('Entity can have only one Primary Key (use composite keys if needed)');
     }
 
-    // PK não pode ser nullable
+    // PK cannot be nullable
     primaryKeys.forEach(pk => {
       if (pk.nullable) {
         result.errors.push(`Primary Key "${pk.name}" cannot be nullable`);
@@ -163,7 +159,7 @@ export class SqlValidationService {
     const attributeNames = new Set<string>();
 
     entity.items.forEach((attr, index) => {
-      // Nome obrigatório
+      // Required
       if (!attr.name || attr.name.trim() === '') {
         result.errors.push(`Attribute at position ${index + 1} must have a name`);
         return;
@@ -171,24 +167,24 @@ export class SqlValidationService {
 
       const attrName = attr.name.trim();
 
-      // Validação de caracteres SQL válidos
+      // Validate SQL-valid characters
       if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(attrName)) {
         result.errors.push(`Attribute "${attrName}" must start with a letter and contain only letters, numbers, and underscores`);
       }
 
-      // Tamanho do nome
+      // Name length
       if (attrName.length > 64) {
         result.errors.push(`Attribute "${attrName}" name must be 64 characters or less`);
       }
 
-      // Nomes duplicados
+      // Duplicate names
       const lowerName = attrName.toLowerCase();
       if (attributeNames.has(lowerName)) {
         result.errors.push(`Duplicate attribute name: "${attrName}"`);
       }
       attributeNames.add(lowerName);
 
-      // Palavras reservadas para colunas
+      // Common system column names
       const reservedColumnNames = ['id', 'created_at', 'updated_at', 'deleted_at'];
       if (reservedColumnNames.includes(lowerName) && !attr.pk) {
         result.warnings.push(`"${attrName}" is commonly used as a system column name`);
@@ -203,7 +199,7 @@ export class SqlValidationService {
         return;
       }
 
-      // Validações específicas por tipo
+      // Type-specific validations
       this.validateSpecificDataType(attr, result);
     });
   }
@@ -214,7 +210,7 @@ export class SqlValidationService {
     switch (attr.type) {
       case DataType.INTEGER:
       case DataType.BIGINT:
-        // Números não deveriam ter default values não-numéricos
+        // Numeric types should not have non-numeric default values
         if (attr.defaultValue && attr.defaultValue.trim() !== '' && isNaN(Number(attr.defaultValue))) {
           result.errors.push(`${attrName} with ${attr.type} type has invalid default value: "${attr.defaultValue}"`);
         }
@@ -254,25 +250,25 @@ export class SqlValidationService {
     entity.items.forEach(attr => {
       const attrName = attr.name || 'unnamed attribute';
 
-      // AUTO_INCREMENT só para tipos numéricos inteiros
+      // AUTO_INCREMENT is only valid for integer types
       if (attr.autoIncrement) {
         const validAutoIncrementTypes = [DataType.INTEGER, DataType.BIGINT];
         if (!validAutoIncrementTypes.includes(attr.type as DataType)) {
           result.errors.push(`${attrName} with AUTO_INCREMENT must be INTEGER or BIGINT`);
         }
 
-        // AUTO_INCREMENT deve ser PRIMARY KEY ou UNIQUE
+        // AUTO_INCREMENT must be PRIMARY KEY or UNIQUE
         if (!attr.pk && !attr.unique) {
           result.errors.push(`${attrName} with AUTO_INCREMENT should be PRIMARY KEY or UNIQUE`);
         }
 
-        // AUTO_INCREMENT não pode ser nullable
+        // AUTO_INCREMENT cannot be nullable
         if (attr.nullable) {
           result.errors.push(`${attrName} with AUTO_INCREMENT cannot be nullable`);
         }
       }
 
-      // UNIQUE + NOT NULL para chaves alternativas
+      // UNIQUE + nullable is a likely design mistake
       if (attr.unique && attr.nullable) {
         result.warnings.push(`${attrName} is UNIQUE but nullable - consider making it NOT NULL for better performance`);
       }
@@ -288,7 +284,7 @@ export class SqlValidationService {
   }
 
   private validateUniqueConstraints(entity: EntityModel, result: ValidationResult): void {
-    // Verificar se há muitas constraints UNIQUE (performance)
+    // Warn when there are too many UNIQUE constraints (performance concern)
     const uniqueCols = entity.items.filter(attr => attr.unique);
 
     if (uniqueCols.length > 5) {
@@ -317,12 +313,9 @@ export class SqlValidationService {
   }
 
   private validateRelationships(entities: EntityModel[], result: ValidationResult): void {
-    // Validar se foreign keys referenciam primary keys existentes
+    // Validate that foreign key column names follow the _id naming convention
     entities.forEach(entity => {
       entity.items.filter(attr => attr.fk).forEach(fkAttr => {
-        // Aqui você pode adicionar lógica para validar relacionamentos
-        // se tiver um sistema de relacionamentos mais complexo
-
         if (!fkAttr.name.endsWith('_id')) {
           result.warnings.push(`Foreign key "${fkAttr.name}" in entity "${entity.key}" should typically end with "_id"`);
         }
@@ -331,7 +324,7 @@ export class SqlValidationService {
   }
 
   private isValidDateFormat(dateString: string): boolean {
-    // Validação simples de formato de data
+    // Simple date format validation
     const datePatterns = [
       /^\d{4}-\d{2}-\d{2}$/,                    // YYYY-MM-DD
       /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/  // YYYY-MM-DD HH:MM:SS
@@ -340,9 +333,7 @@ export class SqlValidationService {
     return datePatterns.some(pattern => pattern.test(dateString));
   }
 
-  /**
-   * Utilitário para formatar erros e warnings para exibição
-   */
+  /** Formats validation errors and warnings for display. */
   formatValidationMessages(result: ValidationResult): string {
     let message = '';
 

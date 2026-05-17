@@ -337,7 +337,7 @@ export class ProjectModalComponent implements OnInit {
       return;
     }
 
-    // Não pode mudar o papel de si mesmo
+    // Cannot change own role
     if (member.email === this.currentUser?.email) {
       return;
     }

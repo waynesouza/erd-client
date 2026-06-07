@@ -3,8 +3,9 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { Project, CreateProjectDto, UpdateProjectDto } from '../model/project.model';
 import { TeamMember, AddTeamMemberDto, UpdateTeamMemberDto } from '../model/team-member.model';
+import { environment } from '../../environments/environment';
 
-const BASE_URL = 'http://localhost:8080/api/project';
+const BASE_URL = `${environment.apiUrl}/project`;
 const httpOptions = { headers: new HttpHeaders({'Content-Type': 'application/json'}) };
 
 @Injectable({

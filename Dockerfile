@@ -1,6 +1,6 @@
 # Multi-stage build para otimização
 # Stage 1: Build da aplicação Angular
-FROM node:16-alpine AS build
+FROM node:20-alpine AS build
 
 # Definir diretório de trabalho
 WORKDIR /app
@@ -15,7 +15,7 @@ RUN npm ci --silent
 COPY . .
 
 # Build da aplicação para produção
-RUN npm run build --configuration=production
+RUN node --max-old-space-size=512 node_modules/.bin/ng build --configuration=production
 
 # Stage 2: Servir a aplicação com nginx
 FROM nginx:alpine

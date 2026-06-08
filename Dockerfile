@@ -1,6 +1,6 @@
 # Multi-stage build para otimização
 # Stage 1: Build da aplicação Angular
-FROM node:20-alpine AS build
+FROM node:16-alpine AS build
 
 # Definir diretório de trabalho
 WORKDIR /app

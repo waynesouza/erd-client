@@ -4,8 +4,9 @@ import { Observable, BehaviorSubject, tap, catchError, throwError } from 'rxjs';
 import { RegisterModel } from '../model/register.model';
 import { LoginModel } from '../model/login.model';
 import { StorageService } from './storage.service';
+import { environment } from '../../environments/environment';
 
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = environment.apiUrl;
 const httpOptions = { 
   headers: new HttpHeaders({'Content-Type': 'application/json'}),
   withCredentials: true // Ensure cookies are sent

@@ -15,7 +15,7 @@ RUN npm ci --silent
 COPY . .
 
 # Build da aplicação para produção
-RUN npm run build --configuration=production
+RUN node --max-old-space-size=512 node_modules/.bin/ng build --configuration=production
 
 # Stage 2: Servir a aplicação com nginx
 FROM nginx:alpine

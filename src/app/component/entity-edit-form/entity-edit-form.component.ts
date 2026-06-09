@@ -52,40 +52,34 @@ export class EntityEditFormComponent {
     this.close.emit();
   }
 
-  // Validação automática quando o usuário seleciona Primary Key
   onPrimaryKeyChange(attribute: AttributeModel): void {
     if (attribute.pk) {
-      // Desmarcar outras PKs (apenas uma PK permitida)
+      // Only one PK allowed — uncheck all others
       this.entity.items.forEach(attr => {
         if (attr !== attribute) {
           attr.pk = false;
         }
       });
-      
-      // PK deve ser NOT NULL
+      // PK must be NOT NULL
       attribute.nullable = false;
     }
   }
 
-  // Validação automática quando o usuário seleciona AUTO_INCREMENT
   onAutoIncrementChange(attribute: AttributeModel): void {
     if (attribute.autoIncrement) {
-      // Desmarcar outros AUTO_INCREMENT (apenas um permitido)
+      // Only one AUTO_INCREMENT allowed — uncheck all others
       this.entity.items.forEach(attr => {
         if (attr !== attribute) {
           attr.autoIncrement = false;
         }
       });
-      
-      // AUTO_INCREMENT deve ser NOT NULL
+      // AUTO_INCREMENT must be NOT NULL
       attribute.nullable = false;
-      
-      // AUTO_INCREMENT deve ser INTEGER ou BIGINT
+      // AUTO_INCREMENT must be INTEGER or BIGINT
       if (attribute.type !== DataType.INTEGER && attribute.type !== DataType.BIGINT) {
         attribute.type = DataType.INTEGER;
       }
-      
-      // AUTO_INCREMENT geralmente é PK
+      // AUTO_INCREMENT is typically a PK
       if (!attribute.pk && !attribute.unique) {
         attribute.pk = true;
         this.onPrimaryKeyChange(attribute);
@@ -93,20 +87,19 @@ export class EntityEditFormComponent {
     }
   }
 
-  // Validação de nome de atributo em tempo real
   validateAttributeName(attribute: AttributeModel): boolean {
     if (!attribute.name || attribute.name.trim() === '') {
       return false;
     }
 
     const attrName = attribute.name.trim();
-    
-    // Verificar caracteres válidos
+
+    // Validate SQL-valid characters
     if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(attrName)) {
       return false;
     }
 
-    // Verificar duplicatas
+    // Check for duplicates
     const duplicates = this.entity.items.filter(attr => 
       attr !== attribute && 
       attr.name && 
@@ -116,15 +109,14 @@ export class EntityEditFormComponent {
     return duplicates.length === 0;
   }
 
-  // Validação de nome de entidade em tempo real
   validateEntityName(): boolean {
     if (!this.entity.key || this.entity.key.trim() === '') {
       return false;
     }
 
     const entityName = this.entity.key.trim();
-    
-    // Verificar caracteres válidos
+
+    // Validate SQL-valid characters
     if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityName)) {
       return false;
     }
@@ -132,12 +124,10 @@ export class EntityEditFormComponent {
     return entityName.length >= 2 && entityName.length <= 64;
   }
 
-  // Verificar se há pelo menos uma PK
   hasPrimaryKey(): boolean {
     return this.entity.items.some(attr => attr.pk);
   }
 
-  // Obter mensagem de erro para atributo
   getAttributeError(attribute: AttributeModel): string {
     if (!this.validateAttributeName(attribute)) {
       if (!attribute.name || attribute.name.trim() === '') {

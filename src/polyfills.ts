@@ -60,5 +60,5 @@ import 'zone.js';  // Included with Angular CLI.
   browser: true
 };
 
-// Mock do módulo websocket para stompjs
+// WebSocket shim for stompjs
 (window as any).WebSocket = (window as any).WebSocket || (window as any).MozWebSocket;

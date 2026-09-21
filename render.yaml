@@ -1,0 +1,27 @@
+# Render Blueprint (infrastructure as code) for the frontend.
+#
+# The backend has its own Blueprint in the erd-core repository. A resource must not belong to
+# two Blueprints, and keeping them apart also keeps each repository's deploy records on its own
+# GitHub Deployments tab.
+#
+# nginx serves the Angular build and proxies /api and /ws to the backend's public URL, which
+# keeps the browser on a single origin: free services cannot use Render's private network, and
+# onrender.com is on the Public Suffix List, so sibling subdomains are cross-site and would drop
+# the JWT cookie.
+services:
+  - type: web
+    name: erd-client
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    # Waits for the commit's CI checks instead of deploying on push. Render skips the deploy
+    # when a commit has zero checks, which is why build.yml also runs on push to main.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PORT
+        value: "80"
+      # Upstream for the /api and /ws proxies. Must match the backend's real URL: if Render
+      # suffixed the backend service name, use the suffixed URL here.
+      - key: BACKEND_URL
+        value: "https://erd-core.onrender.com"

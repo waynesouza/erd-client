@@ -1,0 +1,3 @@
+# nginx parses this file inside a Linux container, so it must stay LF even when the
+# repository is checked out on Windows with core.autocrlf enabled.
+nginx/default.conf.template text eol=lf

@@ -20,8 +20,14 @@ RUN npm run build
 # Stage 2: Servir a aplicação com nginx
 FROM nginx:alpine
 
-# Copiar configuração customizada do nginx
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copiar template do nginx (o entrypoint da imagem expande as variáveis no startup)
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+
+# BACKEND_URL aponta para o serviço do docker-compose por padrão e é sobrescrito no deploy.
+# O resolver local é necessário porque o upstream do proxy fica em uma variável.
+ENV BACKEND_URL=http://erd-core:8080 \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    NGINX_ENVSUBST_FILTER="^(BACKEND_URL|NGINX_LOCAL_RESOLVERS)$"
 
 # Copiar arquivos buildados do stage anterior
 COPY --from=build /app/dist/erd_frontend /usr/share/nginx/html

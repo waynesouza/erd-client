@@ -58,8 +58,15 @@ docker compose up --build erd-client
 The production image serves the Angular build with nginx and proxies `/api` and `/ws` to the
 backend, so both run on a single origin. The upstream comes from the `BACKEND_URL` environment
 variable, which defaults to `http://erd-core:8080` (the docker-compose service) and is set to
-erd-core's public URL when deployed. The full procedure lives in the deploy section of the
-erd-core README.
+erd-core's public URL when deployed.
+
+`render.yaml` in this repository is the Render Blueprint for this service; the backend has its own
+in the erd-core repository, which is also where the database setup is documented. Create it with
+**New → Blueprint** in Render, pointing at this repository.
+
+Deploys use `autoDeployTrigger: checksPass`, so merging a pull request into `main` only deploys
+after the merge commit's checks are green. Render skips the deploy when a commit carries no checks
+at all, which is why `build.yml` also runs on pushes to `main`.
 
 ## Built With
 

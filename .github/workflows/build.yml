@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize]
     branches: [ main ]
+  # Also on main: Render only deploys after the merge commit's checks pass, and it skips the
+  # deploy entirely when a commit carries no checks.
+  push:
+    branches: [ main ]
 
 jobs:
   build:

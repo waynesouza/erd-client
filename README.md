@@ -53,6 +53,14 @@ docker compose up --build erd-client
 4. Run `ng serve` to start the development server.
 5. Open http://localhost:4200 in your browser.
 
+## Deploy
+
+The production image serves the Angular build with nginx and proxies `/api` and `/ws` to the
+backend, so both run on a single origin. The upstream comes from the `BACKEND_URL` environment
+variable, which defaults to `http://erd-core:8080` (the docker-compose service) and is set to
+erd-core's public URL when deployed. The full procedure lives in the deploy section of the
+erd-core README.
+
 ## Built With
 
 - [Angular](https://angular.io/)

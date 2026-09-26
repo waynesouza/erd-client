@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import * as go from 'gojs';
 
 import { DiagramComponent } from './diagram.component';
 import { DiagramService } from '../service/diagram.service';
@@ -87,6 +88,20 @@ describe('DiagramComponent - switching between projects', () => {
     openProject('test-2');
 
     expect(component.diagram).withContext('diagram after the switch').toBeTruthy();
+    expect(() => component.addEntity()).not.toThrow();
+  });
+
+  it('re-creates the diagram when the div still holds one', () => {
+    fixture.detectChanges();
+    const div = fixture.nativeElement.querySelector('#myDiagramDiv') as HTMLDivElement;
+    // Someone else attached a Diagram to our element and never released it;
+    // GoJS would refuse the div outright rather than let us create another.
+    const squatter = new go.Diagram(div);
+
+    openProject('test-1');
+
+    expect(go.Diagram.fromDiv(div)).withContext('diagram on the div').toBe(component.diagram);
+    expect(squatter.div).withContext('squatter released').toBeNull();
     expect(() => component.addEntity()).not.toThrow();
   });
 

@@ -68,6 +68,40 @@ Deploys use `autoDeployTrigger: checksPass`, so merging a pull request into `mai
 after the merge commit's checks are green. Render skips the deploy when a commit carries no checks
 at all, which is why `build.yml` also runs on pushes to `main`.
 
+### Environment variables
+
+No secret is needed here: the frontend holds no credentials.
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `PORT` | `80` | Port nginx listens on and Render routes traffic to |
+| `BACKEND_URL` | `https://erd-core.onrender.com` | Upstream of the `/api` and `/ws` proxies. It must be the backend's real URL — if Render suffixed that service's name, use the suffixed one. |
+
+Both come from `render.yaml`, so there is nothing to type when creating the Blueprint.
+
+#### Set by the Dockerfile
+
+Part of how the image works; leave them alone.
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `BACKEND_URL` | `http://erd-core:8080` | Default upstream, which is what keeps `docker-compose` working with no extra configuration. Render overrides it. |
+| `NGINX_ENTRYPOINT_LOCAL_RESOLVERS` | `1` | Makes the entrypoint publish the container's DNS servers as `NGINX_LOCAL_RESOLVERS`, needed because the upstream lives in an nginx variable and is resolved per request |
+| `NGINX_ENVSUBST_FILTER` | `^(BACKEND_URL\|NGINX_LOCAL_RESOLVERS)$` | Restricts `envsubst` to these two names, so nginx's own `$uri`, `$host` and friends survive the template rendering |
+
+#### Local development (`.env`)
+
+`docker-compose.yml` reads `.env`, which is gitignored; `.env.example` carries working values for
+every key. The frontend itself only uses `CLIENT_LOCAL_PORT` and `CLIENT_DOCKER_PORT` — the
+remaining keys (Postgres, MongoDB, JWT) belong to the other services the compose file starts.
+
+#### Not environment variables
+
+The API and WebSocket addresses are baked in at build time from
+`src/environments/environment.prod.ts`, which points at the relative paths `/api` and `/ws` so the
+nginx proxy can route them. Changing the backend URL is a matter of `BACKEND_URL`, not of
+rebuilding the Angular bundle.
+
 ## Built With
 
 - [Angular](https://angular.io/)

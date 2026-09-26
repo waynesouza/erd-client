@@ -30,6 +30,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   @Input() entities: EntityModel[] = [];
   @Input() selectedProjectId: string = '';
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('diagramDiv') diagramDiv?: ElementRef<HTMLDivElement>;
   relationships: any[] = [];
   locations: go.Point[] = [];
   darkMode: boolean = false;
@@ -56,6 +57,10 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   private stompSubscriptions: any[] = [];
   private changeSubject = new Subject<void>();
   private autoSaveSubscription!: Subscription;
+  // Subscriptions to root-provided services: they outlive this component unless
+  // torn down here, and a leaked one keeps a destroyed instance rebuilding the
+  // diagram over the live instance's div.
+  private serviceSubscriptions = new Subscription();
   private isUpdatingFromServer = false;
 
   constructor(
@@ -90,7 +95,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     this.stompClient.activate();
 
     // Monitor project changes and load data with permissions
-    this.sharedService.currentProjectId.subscribe((projectId: any) => {
+    this.serviceSubscriptions.add(this.sharedService.currentProjectId.subscribe((projectId: any) => {
       if (projectId) {
         this.projectId = projectId;
         this.loadProjectData(projectId);
@@ -101,10 +106,10 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       } else {
         this.clearProjectData();
       }
-    });
+    }));
 
     // Monitor entity locks and update diagram in real time
-    this.collaborationService.lockedEntities$.subscribe((locks: EntityLock[]) => {
+    this.serviceSubscriptions.add(this.collaborationService.lockedEntities$.subscribe((locks: EntityLock[]) => {
       console.log('Locks updated via WebSocket:', locks);
       this.lockedEntities = locks;
       // Update diagram immediately when locks change
@@ -112,7 +117,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
         this.updateDiagramLockStates();
         this.refreshDiagramBindings();
       }, 100);
-    });
+    }));
 
     this.autoSaveSubscription = this.changeSubject.pipe(
       debounceTime(1500)
@@ -294,6 +299,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   }
 
   ngOnDestroy(): void {
+    this.serviceSubscriptions.unsubscribe();
     this.autoSaveSubscription?.unsubscribe();
     this.changeSubject.complete();
     this.stompSubscriptions.forEach(sub => sub.unsubscribe());
@@ -314,7 +320,22 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       this.diagram = null;
     }
 
-    this.diagram = this.diagramRenderer.create('myDiagramDiv', this);
+    // This instance's own div, never whatever `myDiagramDiv` resolves to in the
+    // document: a stale instance would otherwise build its diagram on the live
+    // one's element.
+    const div = this.diagramDiv?.nativeElement ?? document.getElementById('myDiagramDiv');
+    if (!div) {
+      console.error('Cannot initialize diagram: #myDiagramDiv is not in the DOM');
+      return;
+    }
+
+    // GoJS refuses a div that still has a Diagram attached, so release it first.
+    const attached = go.Diagram.fromDiv(div);
+    if (attached) {
+      attached.div = null;
+    }
+
+    this.diagram = this.diagramRenderer.create(div as HTMLDivElement, this);
     this.diagram.model = new go.GraphLinksModel({nodeDataArray: this.entities});
   }
 

@@ -82,7 +82,7 @@
     </div>
 
     <div class="diagram-area" [class.full-width]="!projectId" [class.viewer-mode]="!canEdit">
-      <div id="myDiagramDiv" [class.dark-mode]="darkMode" [class.read-only]="!canEdit"></div>
+      <div #diagramDiv id="myDiagramDiv" [class.dark-mode]="darkMode" [class.read-only]="!canEdit"></div>
       
       <!-- Legenda de ícones -->
       <div class="icon-legend" *ngIf="projectId && entities.length > 0 && showLegend">

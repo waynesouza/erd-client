@@ -60,8 +60,8 @@ export interface DiagramRenderHost {
 })
 export class DiagramRendererService {
 
-  create(divId: string, host: DiagramRenderHost): go.Diagram {
-    const diagram: go.Diagram = $(go.Diagram, divId, {
+  create(div: string | HTMLDivElement, host: DiagramRenderHost): go.Diagram {
+    const diagram: go.Diagram = $(go.Diagram, div, {
       initialContentAlignment: go.Spot.Center,
       'animationManager.isEnabled': false,
       'undoManager.isEnabled': true,

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import * as go from 'gojs';
+import { Location } from '../model/entity.model';
 
 const $ = go.GraphObject.make;
 
@@ -145,7 +146,8 @@ export class DiagramRendererService {
             host.entityClicked(node.part.data);
           }
         },
-        new go.Binding('location', 'location').makeTwoWay(),
+        new go.Binding('location', 'location', (loc: Location) => new go.Point(Number(loc.x), Number(loc.y)))
+          .makeTwoWay((point: go.Point): Location => ({ x: point.x, y: point.y })),
         $(go.Shape, 'RoundedRectangle',
           {
             name: 'MAIN_SHAPE',

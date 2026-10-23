@@ -1,4 +1,3 @@
-import { Point } from 'gojs';
 import { AttributeModel } from '../app/model/attribute.model';
 import { AuthResponseModel } from '../app/model/auth-response.model';
 import { EntityModel } from '../app/model/entity.model';
@@ -28,7 +27,7 @@ export function makeEntity(overrides: Partial<EntityModel> = {}): EntityModel {
     id: 'entity-1',
     key: 'Customer',
     items: [makeAttribute()],
-    location: new Point(0, 0),
+    location: { x: 0, y: 0 },
     ...overrides
   };
 }

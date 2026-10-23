@@ -105,6 +105,30 @@ describe('DiagramComponent - switching between projects', () => {
     expect(() => component.addEntity()).not.toThrow();
   });
 
+  it('places saved tables at their saved positions', () => {
+    diagramSpy.getDiagram.and.returnValue(of(savedDiagram('Customer')) as any);
+
+    fixture.detectChanges();
+    openProject('test-1');
+
+    const node = component.diagram.findNodeForKey('Customer')!;
+    expect(node.location.x).toBe(120);
+    expect(node.location.y).toBe(80);
+  });
+
+  it('keeps a moved table position in the shape the backend stores', () => {
+    diagramSpy.getDiagram.and.returnValue(of(savedDiagram('Customer')) as any);
+    fixture.detectChanges();
+    openProject('test-1');
+
+    const node = component.diagram.findNodeForKey('Customer')!;
+    component.diagram.commit(() => node.location = new go.Point(300, 150));
+
+    // Serialized as the backend's LocationDTO; a go.Point would come out as
+    // GoJS-internal fields (`px`/`py` in GoJS 4) and the position would be lost.
+    expect(JSON.parse(JSON.stringify(component.entities[0].location))).toEqual({ x: 300, y: 150 });
+  });
+
   it('can add a table after switching from one project to another', () => {
     fixture.detectChanges();
     openProject('test-1');

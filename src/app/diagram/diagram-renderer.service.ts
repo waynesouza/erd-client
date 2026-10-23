@@ -67,7 +67,7 @@ export class DiagramRendererService {
       'undoManager.isEnabled': true,
       allowDelete: true,
       allowCopy: false,
-      'toolManager.mouseWheelBehavior': go.ToolManager.WheelZoom,
+      'toolManager.mouseWheelBehavior': go.WheelMode.Zoom,
       'clickCreatingTool.archetypeNodeData': { text: 'new node' },
       model: new go.GraphLinksModel([])
     });
@@ -75,7 +75,7 @@ export class DiagramRendererService {
     const itemTemplate = $(go.Panel, 'Horizontal',
       {
         margin: new go.Margin(4, 0, 4, 0),
-        stretch: go.GraphObject.Horizontal,
+        stretch: go.Stretch.Horizontal,
         defaultAlignment: go.Spot.Left,
         toolTip: $('ToolTip',
           $(go.TextBlock,
@@ -101,7 +101,7 @@ export class DiagramRendererService {
           font: '14px Inter, system-ui, sans-serif',
           margin: new go.Margin(0, 6, 0, 0),
           maxSize: new go.Size(120, NaN),
-          overflow: go.TextBlock.OverflowEllipsis
+          overflow: go.TextOverflow.Ellipsis
         },
         new go.Binding('text', 'name'),
         new go.Binding('stroke', '', () => host.getPrimaryTextStroke()),
@@ -122,7 +122,7 @@ export class DiagramRendererService {
           stroke: '#6b7280',
           margin: new go.Margin(0, 4, 0, 0),
           maxSize: new go.Size(80, NaN),
-          overflow: go.TextBlock.OverflowEllipsis
+          overflow: go.TextOverflow.Ellipsis
         },
         new go.Binding('text', 'type'),
         new go.Binding('stroke', '', () => host.getSecondaryTextStroke())
@@ -134,7 +134,7 @@ export class DiagramRendererService {
         {
           selectionAdorned: true,
           resizable: true,
-          layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
+          layoutConditions: go.LayoutConditions.Standard & ~go.LayoutConditions.NodeSized,
           fromSpot: go.Spot.AllSides,
           toSpot: go.Spot.AllSides,
           isShadowed: true,
@@ -162,14 +162,14 @@ export class DiagramRendererService {
             margin: 0,
             minSize: new go.Size(220, NaN)
           },
-          $(go.RowColumnDefinition, { row: 0, sizing: go.RowColumnDefinition.None }),
-          $(go.RowColumnDefinition, { row: 1, sizing: go.RowColumnDefinition.None }),
+          $(go.RowColumnDefinition, { row: 0, sizing: go.Sizing.None }),
+          $(go.RowColumnDefinition, { row: 1, sizing: go.Sizing.None }),
 
           $(go.Panel, 'Horizontal',
             {
               row: 0,
               alignment: go.Spot.Center,
-              stretch: go.GraphObject.Horizontal,
+              stretch: go.Stretch.Horizontal,
               background: '#f3f4f6',
               margin: new go.Margin(0, 0, 1, 0)
             },
@@ -187,7 +187,7 @@ export class DiagramRendererService {
                 font: '600 18px Inter, system-ui, sans-serif',
                 margin: new go.Margin(10, 4, 10, 0),
                 maxSize: new go.Size(200, NaN),
-                overflow: go.TextBlock.OverflowEllipsis
+                overflow: go.TextOverflow.Ellipsis
               },
               new go.Binding('text', 'key'),
               new go.Binding('stroke', '', () => host.getPrimaryTextStroke())
@@ -214,7 +214,7 @@ export class DiagramRendererService {
                 {
                   font: '10px Inter, system-ui, sans-serif',
                   maxSize: new go.Size(80, NaN),
-                  overflow: go.TextBlock.OverflowEllipsis
+                  overflow: go.TextOverflow.Ellipsis
                 },
                 new go.Binding('text', 'id', (entityId: string) =>
                   host.getLockUserLabel(entityId)).ofObject(),
@@ -229,7 +229,7 @@ export class DiagramRendererService {
               name: 'ATTRIBUTES',
               row: 1,
               margin: new go.Margin(8, 8, 8, 8),
-              stretch: go.GraphObject.Horizontal,
+              stretch: go.Stretch.Horizontal,
               itemTemplate: itemTemplate,
               defaultAlignment: go.Spot.Left
             },
@@ -241,8 +241,8 @@ export class DiagramRendererService {
     diagram.linkTemplate =
       $(go.Link,
         {
-          routing: go.Link.AvoidsNodes,
-          curve: go.Link.JumpOver,
+          routing: go.Routing.AvoidsNodes,
+          curve: go.Curve.JumpOver,
           corner: 10,
           selectionAdorned: true,
           fromEndSegmentLength: 50,
@@ -379,7 +379,7 @@ export class DiagramRendererService {
           stroke: 'white',
           margin: 8,
           maxSize: new go.Size(200, NaN),
-          wrap: go.TextBlock.WrapFit
+          wrap: go.Wrap.Fit
         }
       )
     );

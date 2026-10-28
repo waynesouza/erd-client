@@ -24,7 +24,6 @@ export class TableEditorComponent implements OnInit {
         id: '',
         key: '',
         items: [],
-        // @ts-ignore
         location: {x: 0, y: 0}
       };
     }

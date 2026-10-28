@@ -109,3 +109,15 @@ rebuilding the Angular bundle.
 - [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 - [GoJS](https://gojs.net/latest/index.html) - for creating and managing interactive diagrams
 - [SockJS](https://github.com/sockjs/sockjs-client) and [StompJS](https://stomp-js.github.io/stomp-websocket/codo/extra/docs-src/Usage.md.html) - for communicating with the server
+
+## GoJS License
+
+GoJS is commercial software. This project is an undergraduate thesis (TCC) and uses GoJS 4.x under
+the [Non-Commercial Software License Agreement](https://gojs.net/latest/nonCommercialLicense.html),
+with `go.Diagram.licenseKey = 'academic'` set in `src/main.ts`, so the diagram shows the "Academic"
+watermark by design. The key is only recognized from GoJS 4.0.4 onward, which is why the dependency
+is pinned to `~4.0.5`. See the [deployment instructions](https://gojs.net/latest/learn/deployment)
+for details.
+
+`tsconfig.json` sets `skipLibCheck` because the GoJS 4 typings use `ArrayIterator`, which TypeScript
+4.7 (the version Angular 14 supports) does not know about.

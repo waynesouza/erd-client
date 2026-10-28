@@ -5,7 +5,7 @@ import { DiagramRendererService, DiagramRenderHost, LockVisual } from './diagram
 import { StompClientFactory } from './stomp-client.factory';
 import { DiagramService } from '../service/diagram.service';
 import { DiagramModel } from '../model/diagram.model';
-import { EntityModel } from '../model/entity.model';
+import { EntityModel, Location } from '../model/entity.model';
 import { SharedService } from '../service/shared.service';
 import { IntermediaryEntityModel } from '../model/intermediary-entity.model';
 import { AttributeModel } from '../model/attribute.model';
@@ -32,7 +32,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
   @ViewChild('diagramDiv') diagramDiv?: ElementRef<HTMLDivElement>;
   relationships: any[] = [];
-  locations: go.Point[] = [];
+  locations: Location[] = [];
   darkMode: boolean = false;
   showTableEditor: boolean = false;
   showLegend: boolean = false;
@@ -265,7 +265,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
         console.log('Received diagram data:', diagramData);
         if (diagramData && diagramData.nodeDataArray) {
           this.locations = diagramData.nodeDataArray.map((entity: EntityModel) => {
-            return new go.Point(Number(entity.location?.x || 0), Number(entity.location?.y || 0));
+            return { x: Number(entity.location?.x || 0), y: Number(entity.location?.y || 0) };
           });
           this.entities = diagramData.nodeDataArray;
           this.relationships = diagramData.linkDataArray || [];
@@ -445,7 +445,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       id: crypto.randomUUID(),
       key: `table${this.entities.length + 1}`,
       items: [],
-      location: new go.Point(Math.random() * 400, Math.random() * 400)
+      location: { x: Math.random() * 400, y: Math.random() * 400 }
     };
 
     this.entities.push(newEntity);
@@ -648,7 +648,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       id: crypto.randomUUID(),
       key: `${sourceEntity.key}_${targetEntity.key}`,
       items: [firstForeignKey, secondForeignKey],
-      location: new go.Point(Math.random() * 400, Math.random() * 400),
+      location: { x: Math.random() * 400, y: Math.random() * 400 },
       firstEntityId: sourceEntity.key,
       secondEntityId: targetEntity.key
     };
@@ -1174,7 +1174,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
         if (this.locations[index]) {
           entity.location = this.locations[index];
         } else {
-          entity.location = new go.Point(Math.random() * 400, Math.random() * 400);
+          entity.location = { x: Math.random() * 400, y: Math.random() * 400 };
         }
       });
 
@@ -1191,7 +1191,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     this.isUpdatingFromServer = true;
     const data = JSON.parse(message.body);
     this.locations = data.nodeDataArray.map((entity: EntityModel) => {
-      return new go.Point(Number(entity.location.x), Number(entity.location.y));
+      return { x: Number(entity.location.x), y: Number(entity.location.y) };
     });
     this.entities = data.nodeDataArray;
     this.relationships = data.linkDataArray;

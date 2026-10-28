@@ -23,7 +23,7 @@
     "@stomp/stompjs": "^7.1.1",
     "bootstrap": "^4.6.1",
     "bootstrap-icons": "^1.11.3",
-    "gojs": "^2.3.14",
+    "gojs": "~4.0.5",
     "net": "^1.0.2",
     "rxjs": "~7.5.0",
     "sockjs-client": "^1.6.1",

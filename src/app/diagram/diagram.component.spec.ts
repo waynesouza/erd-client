@@ -1678,7 +1678,7 @@ describe('DiagramComponent', () => {
     it('should reuse the stored locations', () => {
       withDiagram();
       component.entities = [makeEntity()];
-      component.locations = [new go.Point(11, 22)];
+      component.locations = [{ x: 11, y: 22 }];
 
       component.remakeDiagram();
 

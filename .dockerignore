@@ -4,3 +4,4 @@ dist/
 .angular/
 coverage/
 *.md
+e2e/

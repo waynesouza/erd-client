@@ -914,7 +914,7 @@ describe('DiagramComponent', () => {
       component.ngOnInit();
       tick(100);
 
-      expect(stompFactory.create).toHaveBeenCalledOnceWith('http://localhost:8080/ws');
+      expect(stompFactory.create).toHaveBeenCalledOnceWith('http://localhost:8080/api/ws');
       expect(stompClient.activated).toBeTrue();
     }));
 

@@ -55,7 +55,7 @@ docker compose up --build erd-client
 
 ## Deploy
 
-The production image serves the Angular build with nginx and proxies `/api` and `/ws` to the
+The production image serves the Angular build with nginx and proxies `/api` (including the `/api/ws` WebSocket endpoint) to the
 backend, so both run on a single origin. The upstream comes from the `BACKEND_URL` environment
 variable, which defaults to `http://erd-core:8080` (the docker-compose service) and is set to
 erd-core's public URL when deployed.
@@ -75,7 +75,7 @@ No secret is needed here: the frontend holds no credentials.
 | Variable | Value | Why |
 | --- | --- | --- |
 | `PORT` | `80` | Port nginx listens on and Render routes traffic to |
-| `BACKEND_URL` | `https://erd-core.onrender.com` | Upstream of the `/api` and `/ws` proxies. It must be the backend's real URL — if Render suffixed that service's name, use the suffixed one. |
+| `BACKEND_URL` | `https://erd-core.onrender.com` | Upstream of the `/api` and `/api/ws` proxies. It must be the backend's real URL — if Render suffixed that service's name, use the suffixed one. |
 
 Both come from `render.yaml`, so there is nothing to type when creating the Blueprint.
 
@@ -98,7 +98,7 @@ remaining keys (Postgres, MongoDB, JWT) belong to the other services the compose
 #### Not environment variables
 
 The API and WebSocket addresses are baked in at build time from
-`src/environments/environment.prod.ts`, which points at the relative paths `/api` and `/ws` so the
+`src/environments/environment.prod.ts`, which points at the relative paths `/api` and `/api/ws` so the
 nginx proxy can route them. Changing the backend URL is a matter of `BACKEND_URL`, not of
 rebuilding the Angular bundle.
 

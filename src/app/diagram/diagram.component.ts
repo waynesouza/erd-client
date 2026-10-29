@@ -3,6 +3,7 @@ import * as go from 'gojs';
 import { Client } from '@stomp/stompjs';
 import { DiagramRendererService, DiagramRenderHost, LockVisual } from './diagram-renderer.service';
 import { StompClientFactory } from './stomp-client.factory';
+import { applyDiagramPatch, DiagramState, diffDiagram, isEmptyPatch, snapshotDiagram } from './diagram-patch';
 import { DiagramService } from '../service/diagram.service';
 import { DiagramModel } from '../model/diagram.model';
 import { EntityModel, Location } from '../model/entity.model';
@@ -33,6 +34,9 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   @ViewChild('diagramDiv') diagramDiv?: ElementRef<HTMLDivElement>;
   relationships: any[] = [];
   locations: Location[] = [];
+  // The last state received from the server. Local changes are sent as a patch
+  // against it, and replayed on top of every newer state that arrives.
+  private baseState: DiagramState = { entities: [], relationships: [] };
   darkMode: boolean = false;
   showTableEditor: boolean = false;
   showLegend: boolean = false;
@@ -269,6 +273,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
           });
           this.entities = diagramData.nodeDataArray;
           this.relationships = diagramData.linkDataArray || [];
+          this.baseState = snapshotDiagram(this.entities, this.relationships);
           this.setupDiagram();
         } else {
           console.error('Invalid diagram data received:', diagramData);
@@ -295,6 +300,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     this.entities = [];
     this.relationships = [];
     this.locations = [];
+    this.baseState = { entities: [], relationships: [] };
     this.initializeDiagram();
   }
 
@@ -1190,11 +1196,14 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   receiveMessageAndRemakeDiagram(message: any): void {
     this.isUpdatingFromServer = true;
     const data = JSON.parse(message.body);
-    this.locations = data.nodeDataArray.map((entity: EntityModel) => {
-      return { x: Number(entity.location.x), y: Number(entity.location.y) };
-    });
-    this.entities = data.nodeDataArray;
-    this.relationships = data.linkDataArray;
+    // Changes not yet acknowledged by the server would be lost by adopting its
+    // state as is; they are replayed on top of it instead.
+    const pending = diffDiagram(this.baseState, snapshotDiagram(this.entities, this.relationships));
+    this.baseState = snapshotDiagram(data.nodeDataArray, data.linkDataArray || []);
+    const merged = applyDiagramPatch(snapshotDiagram(data.nodeDataArray, data.linkDataArray || []), pending);
+    this.locations = merged.entities.map((entity: EntityModel) => ({ x: entity.location.x, y: entity.location.y }));
+    this.entities = merged.entities;
+    this.relationships = merged.relationships;
     this.remakeDiagram();
     this.isUpdatingFromServer = false;
   }
@@ -1222,18 +1231,18 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     this.selectedEntity = {};
   }
 
+  // Sends only what changed since the last server state, so edits other
+  // collaborators made meanwhile to other tables are not overwritten.
   sendToServer(): void {
-    const message: string = JSON.stringify({
-      nodeDataArray: this.entities,
-      linkDataArray: this.relationships,
-      projectId: this.projectId,
-      darkMode: this.darkMode
-    });
+    const patch = diffDiagram(this.baseState, snapshotDiagram(this.entities, this.relationships));
+    if (isEmptyPatch(patch)) {
+      return;
+    }
 
     if (this.stompClient && this.stompClient.connected) {
       this.stompClient.publish({
-        destination: '/app/send',
-        body: message
+        destination: '/app/patch',
+        body: JSON.stringify({ projectId: this.projectId, ...patch })
       });
     } else {
       console.log('Cannot send message, stompClient is not connected');

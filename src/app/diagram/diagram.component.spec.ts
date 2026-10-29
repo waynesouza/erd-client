@@ -1017,6 +1017,7 @@ describe('DiagramComponent', () => {
       component.projectId = 'project-1';
       stompClient.connected = true;
       withDiagram();
+      component.entities = [makeEntity()];
 
       component.onDiagramModified();
       component.onDiagramModified();
@@ -1723,13 +1724,40 @@ describe('DiagramComponent', () => {
       expect(component.locations[0].x).toBe(3);
     });
 
-    it('should throw on a node with no location', () => {
-      // Recorded defect: unlike loadDiagramData, this path has no `?.` guard.
+    it('should place a node with no location at the origin', () => {
       withDiagram();
 
-      expect(() => component.receiveMessageAndRemakeDiagram({
+      component.receiveMessageAndRemakeDiagram({
         body: JSON.stringify({ nodeDataArray: [{ id: 'e1', key: 'C', items: [] }], linkDataArray: [] })
-      })).toThrowError(TypeError);
+      });
+
+      expect(component.locations[0]).toEqual({ x: 0, y: 0 });
+    });
+
+    it('should accept a message without links', () => {
+      withDiagram();
+
+      component.receiveMessageAndRemakeDiagram({
+        body: JSON.stringify({ nodeDataArray: [{ id: 'e1', key: 'C', items: [], location: { x: 1, y: 2 } }] })
+      });
+
+      expect(component.relationships).toEqual([]);
+    });
+
+    it('should keep a pending local change when a newer state from another user arrives', () => {
+      withDiagram();
+      const users = { id: 'e1', key: 'users', items: [], location: { x: 0, y: 0 } };
+      const orders = { id: 'e2', key: 'orders', items: [], location: { x: 0, y: 0 } };
+      component.receiveMessageAndRemakeDiagram({ body: JSON.stringify({ nodeDataArray: [users, orders], linkDataArray: [] }) });
+      // This user renames e1 but the autosave has not gone out yet...
+      component.entities[0].key = 'customers';
+
+      // ...when another user's rename of e2 arrives.
+      component.receiveMessageAndRemakeDiagram({
+        body: JSON.stringify({ nodeDataArray: [users, { ...orders, key: 'invoices' }], linkDataArray: [] })
+      });
+
+      expect(component.entities.map(entity => entity.key)).toEqual(['customers', 'invoices']);
     });
 
     it('should throw on a malformed payload', () => {
@@ -1786,24 +1814,34 @@ describe('DiagramComponent', () => {
       tick(100);
     }));
 
-    it('should publish the diagram when connected', () => {
+    it('should publish only the changes when connected', () => {
       stompClient.connected = true;
       component.projectId = 'project-1';
       component.entities = [makeEntity()];
-      component.darkMode = true;
 
       component.sendToServer();
 
       expect(stompClient.published.length).toBe(1);
-      expect(stompClient.published[0].destination).toBe('/app/send');
+      expect(stompClient.published[0].destination).toBe('/app/patch');
       const body = JSON.parse(stompClient.published[0].body);
       expect(body.projectId).toBe('project-1');
-      expect(body.darkMode).toBeTrue();
-      expect(body.nodeDataArray.length).toBe(1);
+      expect(body.upsertNodes.length).toBe(1);
+      expect(body.removedNodeIds).toEqual([]);
+    });
+
+    it('should publish nothing when nothing changed', () => {
+      stompClient.connected = true;
+      component.entities = [];
+      component.relationships = [];
+
+      component.sendToServer();
+
+      expect(stompClient.published.length).toBe(0);
     });
 
     it('should skip publishing when disconnected', () => {
       stompClient.connected = false;
+      component.entities = [makeEntity()];
 
       component.sendToServer();
 

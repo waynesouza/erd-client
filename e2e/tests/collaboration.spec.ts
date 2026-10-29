@@ -149,7 +149,14 @@ test('CT-07 the locks of a member who disconnects are released for the others', 
 
   // The editor's browser goes away without closing the modal.
   await editorSession.close();
-  await ownerSession.page.waitForTimeout(3000);
+  const closedAt = Date.now();
 
-  await openTableEditor(ownerSession.page, 'table1');
+  // How soon the server notices the closed connection depends on the network
+  // between them (proxies may hold it open), so the owner keeps trying, as a
+  // user would, and the time until the table is released is recorded.
+  await expect(async () => {
+    await doubleClickTable(ownerSession.page, 'table1');
+    await expect(ownerSession.page.locator('#entityName')).toBeVisible({ timeout: 1000 });
+  }).toPass({ intervals: [1000], timeout: 60_000 });
+  test.info().annotations.push({ type: 'release-ms', description: String(Date.now() - closedAt) });
 });

@@ -44,6 +44,16 @@ export async function addMember(owner: Member, projectId: string, member: Member
   expect(response.status()).toBe(201);
 }
 
+/**
+ * Gives a project its starting tables through the SQL import, before any browser opens it, so a
+ * case does not depend on real-time propagation for its preconditions.
+ */
+export async function seedTables(owner: Member, projectId: string, names: string[]): Promise<void> {
+  const ddlContent = names.map(name => `CREATE TABLE ${name} (id INT PRIMARY KEY);`).join(' ');
+  const response = await owner.api.post('/api/ddl/import', { data: { projectId, ddlContent } });
+  expect(response.ok(), 'seeding the tables through the SQL import').toBeTruthy();
+}
+
 /** Logs in through the real login page and opens the project from the sidebar. */
 export async function openSession(browser: Browser, member: Member, projectName: string): Promise<Session> {
   const context = await browser.newContext();

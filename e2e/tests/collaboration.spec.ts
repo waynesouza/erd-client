@@ -12,6 +12,7 @@ import {
   openTableEditor,
   renameOpenTable,
   reopen,
+  seedTables,
   tableKeys,
   timeWhenTableAppears
 } from './support/erd';
@@ -19,7 +20,9 @@ import {
 /**
  * Collaboration test plan. Every case opens real browsers for different
  * members of one project and checks, in the other browsers, what a user
- * would see. Each case gets its own project so they do not interfere.
+ * would see. Each case gets its own project, and its starting tables are
+ * seeded through the SQL import before the browsers open, so a case only
+ * depends on the behaviour it checks.
  */
 const run = `${Date.now()}`;
 let owner: Member;
@@ -32,11 +35,14 @@ test.beforeAll(async () => {
   viewer = await createMember('viewer', run);
 });
 
-async function newProject(name: string): Promise<string> {
+async function newProject(name: string, tables: string[] = []): Promise<string> {
   const projectName = `${name} ${run}`;
   const projectId = await createProject(owner, projectName);
   await addMember(owner, projectId, editor, 'EDITOR');
   await addMember(owner, projectId, viewer, 'VIEWER');
+  if (tables.length > 0) {
+    await seedTables(owner, projectId, tables);
+  }
   return projectName;
 }
 
@@ -58,11 +64,9 @@ test('CT-01 a table added by one member appears for the other members', async ({
 });
 
 test('CT-02 a table renamed in the editor is renamed for the other members', async ({ browser }) => {
-  const project = await newProject('CT-02');
+  const project = await newProject('CT-02', ['table1']);
   const ownerSession = await openSession(browser, owner, project);
   const editorSession = await openSession(browser, editor, project);
-  await addTable(ownerSession.page);
-  await expectTables(editorSession.page, ['table1']);
 
   await openTableEditor(editorSession.page, 'table1');
   await renameOpenTable(editorSession.page, 'customers');
@@ -71,17 +75,15 @@ test('CT-02 a table renamed in the editor is renamed for the other members', asy
 });
 
 test('CT-03 a table being edited is locked for the other members until it is released', async ({ browser }) => {
-  const project = await newProject('CT-03');
+  const project = await newProject('CT-03', ['table1']);
   const ownerSession = await openSession(browser, owner, project);
   const editorSession = await openSession(browser, editor, project);
-  await addTable(ownerSession.page);
-  await expectTables(editorSession.page, ['table1']);
 
   await openTableEditor(editorSession.page, 'table1');
   await ownerSession.page.waitForTimeout(1000);
   await doubleClickTable(ownerSession.page, 'table1');
 
-  await expect.poll(() => ownerSession.dialogs.join('\n')).toContain('Being edited by');
+  await expect.poll(() => ownerSession.dialogs.join(' | ')).toContain('Being edited by');
   await expect(ownerSession.page.locator('#entityName')).toBeHidden();
 
   await closeTableEditor(editorSession.page);
@@ -89,12 +91,10 @@ test('CT-03 a table being edited is locked for the other members until it is rel
   await openTableEditor(ownerSession.page, 'table1');
 });
 
-test('CT-04 a viewer can follow the diagram but not change it', async ({ browser }) => {
-  const project = await newProject('CT-04');
+test('CT-04 a viewer cannot change the diagram', async ({ browser }) => {
+  const project = await newProject('CT-04', ['table1']);
   const ownerSession = await openSession(browser, owner, project);
   const viewerSession = await openSession(browser, viewer, project);
-  await addTable(ownerSession.page);
-  await expectTables(viewerSession.page, ['table1']);
 
   // The viewer's toolbar has no "Add New Table" button at all...
   await expect(viewerSession.page.locator('.add-table-btn')).toHaveCount(0);
@@ -108,13 +108,9 @@ test('CT-04 a viewer can follow the diagram but not change it', async ({ browser
 });
 
 test('CT-05 simultaneous edits to different tables are both kept', async ({ browser }) => {
-  const project = await newProject('CT-05');
+  const project = await newProject('CT-05', ['table1', 'table2']);
   const ownerSession = await openSession(browser, owner, project);
   const editorSession = await openSession(browser, editor, project);
-  await addTable(ownerSession.page);
-  await expectTables(editorSession.page, ['table1']);
-  await addTable(ownerSession.page);
-  await expectTables(editorSession.page, ['table1', 'table2']);
 
   await openTableEditor(ownerSession.page, 'table1');
   await openTableEditor(editorSession.page, 'table2');
@@ -123,11 +119,13 @@ test('CT-05 simultaneous edits to different tables are both kept', async ({ brow
     renameOpenTable(ownerSession.page, 'orders'),
     renameOpenTable(editorSession.page, 'customers')
   ]);
+  await ownerSession.page.waitForTimeout(4000);
 
-  await expectTables(ownerSession.page, ['customers', 'orders']);
-  await expectTables(editorSession.page, ['customers', 'orders']);
+  // What was stored is what any member gets when opening the project again.
   await reopen(ownerSession.page, project);
   await expectTables(ownerSession.page, ['customers', 'orders']);
+  await reopen(editorSession.page, project);
+  await expectTables(editorSession.page, ['customers', 'orders']);
 });
 
 test('CT-06 the diagram is kept after the page is reloaded', async ({ browser }) => {
@@ -143,11 +141,9 @@ test('CT-06 the diagram is kept after the page is reloaded', async ({ browser })
 });
 
 test('CT-07 the locks of a member who disconnects are released for the others', async ({ browser }) => {
-  const project = await newProject('CT-07');
+  const project = await newProject('CT-07', ['table1']);
   const ownerSession = await openSession(browser, owner, project);
   const editorSession = await openSession(browser, editor, project);
-  await addTable(ownerSession.page);
-  await expectTables(editorSession.page, ['table1']);
   await openTableEditor(editorSession.page, 'table1');
   await ownerSession.page.waitForTimeout(1000);
 

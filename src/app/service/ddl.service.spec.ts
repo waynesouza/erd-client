@@ -66,6 +66,18 @@ describe('DdlService', () => {
       expect(completed).toBeTrue();
     });
 
+    it('should emit what the server reports about the import', () => {
+      let result: unknown;
+
+      service.importDdl({ projectId: 'project-1', ddlContent: 'CREATE TABLE t(id INT);' })
+        .subscribe(response => (result = response));
+
+      httpMock.expectOne(`${BASE_URL}/import`)
+        .flush({ tables: 1, relationships: 0, warnings: ['Table t has no primary key.'] });
+
+      expect(result).toEqual({ tables: 1, relationships: 0, warnings: ['Table t has no primary key.'] });
+    });
+
     it('should surface the error arm', () => {
       let status: number | undefined;
 

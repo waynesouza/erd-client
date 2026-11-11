@@ -16,6 +16,14 @@ export interface ImportDdlRequest {
   ddlContent: string;
 }
 
+// What the import produced, and what the script had that a diagram cannot
+// represent. Servers that predate it answer with an empty body.
+export interface ImportDdlResponse {
+  tables: number;
+  relationships: number;
+  warnings: string[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -27,8 +35,8 @@ export class DdlService {
     return this.http.get<ExportDdlResponse>(`${BASE_URL}/export/${projectId}`, httpOptions);
   }
 
-  importDdl(request: ImportDdlRequest): Observable<void> {
-    return this.http.post<void>(`${BASE_URL}/import`, request, httpOptions);
+  importDdl(request: ImportDdlRequest): Observable<ImportDdlResponse | null> {
+    return this.http.post<ImportDdlResponse | null>(`${BASE_URL}/import`, request, httpOptions);
   }
 
   downloadSqlFile(ddlContent: string, filename: string = 'diagram.sql'): void {

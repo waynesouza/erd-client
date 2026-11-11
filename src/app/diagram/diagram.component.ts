@@ -11,6 +11,7 @@ import { SharedService } from '../service/shared.service';
 import { IntermediaryEntityModel } from '../model/intermediary-entity.model';
 import { AttributeModel } from '../model/attribute.model';
 import { LinkDataModel } from '../model/link-data.model';
+import { DataType } from '../model/enum/datatype.enum';
 import { DdlService } from '../service/ddl.service';
 import { CollaborationService, EntityLock, CollaborationMessage } from '../service/collaboration.service';
 import { ProjectService } from '../service/project.service';
@@ -37,6 +38,9 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   // The last state received from the server. Local changes are sent as a patch
   // against it, and replayed on top of every newer state that arrives.
   private baseState: DiagramState = { entities: [], relationships: [] };
+  // The revision of baseState. The server increments it when it replaces the
+  // whole diagram, and drops patches computed against an earlier one.
+  private baseRevision: number | null = null;
   darkMode: boolean = false;
   showTableEditor: boolean = false;
   showLegend: boolean = false;
@@ -274,6 +278,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
           this.entities = diagramData.nodeDataArray;
           this.relationships = diagramData.linkDataArray || [];
           this.baseState = snapshotDiagram(this.entities, this.relationships);
+          this.baseRevision = diagramData.revision ?? null;
           this.setupDiagram();
         } else {
           console.error('Invalid diagram data received:', diagramData);
@@ -301,6 +306,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     this.relationships = [];
     this.locations = [];
     this.baseState = { entities: [], relationships: [] };
+    this.baseRevision = null;
     this.initializeDiagram();
   }
 
@@ -537,7 +543,10 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     }
 
     this.entities = this.entities.filter((e: EntityModel) : boolean => e.id !== id);
-    this.relationships = this.relationships.filter(r => r.from !== id && r.to !== id);
+    // Links name their tables by key, not by id. Comparing them with the id left
+    // links to the removed table behind, and the export could not resolve them.
+    const removedKey = removedEntity?.key;
+    this.relationships = this.relationships.filter(r => r.from !== removedKey && r.to !== removedKey);
     this.diagram.model = new go.GraphLinksModel({
       nodeDataArray: this.entities,
       linkDataArray: this.relationships
@@ -650,10 +659,22 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       autoIncrement: false
     };
 
+    // Every table needs a primary key to be edited, the join table included.
+    const primaryKey: AttributeModel = {
+      name: 'id',
+      type: DataType.INTEGER,
+      pk: true,
+      fk: false,
+      unique: false,
+      defaultValue: '',
+      nullable: false,
+      autoIncrement: true
+    };
+
     const newIntermediaryEntity: IntermediaryEntityModel = {
       id: crypto.randomUUID(),
       key: `${sourceEntity.key}_${targetEntity.key}`,
-      items: [firstForeignKey, secondForeignKey],
+      items: [primaryKey, firstForeignKey, secondForeignKey],
       location: { x: Math.random() * 400, y: Math.random() * 400 },
       firstEntityId: sourceEntity.key,
       secondEntityId: targetEntity.key
@@ -661,12 +682,16 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
 
     this.entities.push(newIntermediaryEntity);
 
+    // Both links start at the join table, which holds both foreign keys. The
+    // first one used to start at the source entity, so the export looked for
+    // the key in the wrong table.
     const firstLinkData: LinkDataModel = {
       id: crypto.randomUUID(),
-      from: sourceEntity.key,
-      to: newIntermediaryEntity.key,
+      from: newIntermediaryEntity.key,
+      to: sourceEntity.key,
       text: '1:N',
       toText: 1,
+      fromColumn: firstForeignKey.name,
     };
 
     const secondLinkData: LinkDataModel = {
@@ -675,6 +700,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       to: targetEntity.key,
       text: '1:N',
       toText: 1,
+      fromColumn: secondForeignKey.name,
     };
 
     this.createRelationship(firstLinkData);
@@ -703,6 +729,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       to: targetEntity.key,
       text: relationshipType,
       toText: 1,
+      fromColumn: foreignKeyAttribute.name,
     };
 
     this.createRelationship(linkData);
@@ -1199,13 +1226,38 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     // Changes not yet acknowledged by the server would be lost by adopting its
     // state as is; they are replayed on top of it instead.
     const pending = diffDiagram(this.baseState, snapshotDiagram(this.entities, this.relationships));
-    this.baseState = snapshotDiagram(data.nodeDataArray, data.linkDataArray || []);
-    const merged = applyDiagramPatch(snapshotDiagram(data.nodeDataArray, data.linkDataArray || []), pending);
+    // A new revision means the whole diagram was replaced, as an import does.
+    // The pending changes refer to the tables it removed, so replaying them
+    // would bring those tables back; they are dropped instead. A diagram that
+    // was never replaced is at revision 0.
+    const revision: number | null = data.revision ?? null;
+    const replaced = revision !== null && revision !== (this.baseRevision ?? 0);
+    const discardsWork = replaced && (this.isEntityEditorModalOpen || !isEmptyPatch(pending));
+    if (replaced) {
+      this.leaveReplacedDiagram();
+    }
+    this.baseRevision = revision;
+    const links = data.linkDataArray || [];
+    this.baseState = snapshotDiagram(data.nodeDataArray, links);
+    const serverState = snapshotDiagram(data.nodeDataArray, links);
+    const merged = replaced ? serverState : applyDiagramPatch(serverState, pending);
     this.locations = merged.entities.map((entity: EntityModel) => ({ x: entity.location.x, y: entity.location.y }));
     this.entities = merged.entities;
     this.relationships = merged.relationships;
     this.remakeDiagram();
     this.isUpdatingFromServer = false;
+    if (discardsWork) {
+      alert('The diagram was replaced by an imported script. Your unsaved changes were discarded.');
+    }
+  }
+
+  // The table being edited may no longer exist, and the server has released its
+  // lock, so the editors are closed without saving.
+  private leaveReplacedDiagram(): void {
+    this.isEntityEditorModalOpen = false;
+    this.selectedEntity = {};
+    this.showTableEditor = false;
+    this.cancelRelationshipSelection();
   }
 
   // Entity editor modal
@@ -1242,7 +1294,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     if (this.stompClient && this.stompClient.connected) {
       this.stompClient.publish({
         destination: '/app/patch',
-        body: JSON.stringify({ projectId: this.projectId, ...patch })
+        body: JSON.stringify({ projectId: this.projectId, baseRevision: this.baseRevision, ...patch })
       });
     } else {
       console.log('Cannot send message, stompClient is not connected');
@@ -1271,6 +1323,10 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   importDdl(): void {
     if (!this.projectId) {
       console.error('No project selected for import');
+      return;
+    }
+
+    if (!confirm('Importing a script replaces the whole diagram for every collaborator. Continue?')) {
       return;
     }
 
@@ -1308,7 +1364,11 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
         },
         error: (error) => {
           console.error('Error importing DDL:', error);
-          alert('Error importing DDL. Please check the file format and try again.');
+          // The server explains why a script was refused, e.g. when it has no table.
+          const reason = error.error?.message;
+          alert(reason
+            ? `Error importing DDL: ${reason}`
+            : 'Error importing DDL. Please check the file format and try again.');
         }
       });
     }).catch((error) => {

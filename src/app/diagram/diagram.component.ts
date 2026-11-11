@@ -11,6 +11,7 @@ import { SharedService } from '../service/shared.service';
 import { IntermediaryEntityModel } from '../model/intermediary-entity.model';
 import { AttributeModel } from '../model/attribute.model';
 import { LinkDataModel } from '../model/link-data.model';
+import { DataType } from '../model/enum/datatype.enum';
 import { DdlService } from '../service/ddl.service';
 import { CollaborationService, EntityLock, CollaborationMessage } from '../service/collaboration.service';
 import { ProjectService } from '../service/project.service';
@@ -542,7 +543,10 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     }
 
     this.entities = this.entities.filter((e: EntityModel) : boolean => e.id !== id);
-    this.relationships = this.relationships.filter(r => r.from !== id && r.to !== id);
+    // Links name their tables by key, not by id. Comparing them with the id left
+    // links to the removed table behind, and the export could not resolve them.
+    const removedKey = removedEntity?.key;
+    this.relationships = this.relationships.filter(r => r.from !== removedKey && r.to !== removedKey);
     this.diagram.model = new go.GraphLinksModel({
       nodeDataArray: this.entities,
       linkDataArray: this.relationships
@@ -655,10 +659,22 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       autoIncrement: false
     };
 
+    // Every table needs a primary key to be edited, the join table included.
+    const primaryKey: AttributeModel = {
+      name: 'id',
+      type: DataType.INTEGER,
+      pk: true,
+      fk: false,
+      unique: false,
+      defaultValue: '',
+      nullable: false,
+      autoIncrement: true
+    };
+
     const newIntermediaryEntity: IntermediaryEntityModel = {
       id: crypto.randomUUID(),
       key: `${sourceEntity.key}_${targetEntity.key}`,
-      items: [firstForeignKey, secondForeignKey],
+      items: [primaryKey, firstForeignKey, secondForeignKey],
       location: { x: Math.random() * 400, y: Math.random() * 400 },
       firstEntityId: sourceEntity.key,
       secondEntityId: targetEntity.key
@@ -666,12 +682,16 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
 
     this.entities.push(newIntermediaryEntity);
 
+    // Both links start at the join table, which holds both foreign keys. The
+    // first one used to start at the source entity, so the export looked for
+    // the key in the wrong table.
     const firstLinkData: LinkDataModel = {
       id: crypto.randomUUID(),
-      from: sourceEntity.key,
-      to: newIntermediaryEntity.key,
+      from: newIntermediaryEntity.key,
+      to: sourceEntity.key,
       text: '1:N',
       toText: 1,
+      fromColumn: firstForeignKey.name,
     };
 
     const secondLinkData: LinkDataModel = {
@@ -680,6 +700,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       to: targetEntity.key,
       text: '1:N',
       toText: 1,
+      fromColumn: secondForeignKey.name,
     };
 
     this.createRelationship(firstLinkData);
@@ -708,6 +729,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       to: targetEntity.key,
       text: relationshipType,
       toText: 1,
+      fromColumn: foreignKeyAttribute.name,
     };
 
     this.createRelationship(linkData);

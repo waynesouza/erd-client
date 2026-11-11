@@ -1434,7 +1434,7 @@ describe('DiagramComponent', () => {
           items: [makeAttribute({ name: 'id', pk: true }), makeAttribute({ name: 'Invoice_id', fk: true, pk: false })]
         })
       ];
-      component.relationships = [relationship({ from: 'e1', to: 'e2' })];
+      component.relationships = [relationship({ from: 'Invoice', to: 'Customer' })];
 
       component.handleRemove('e1');
 
@@ -1445,20 +1445,22 @@ describe('DiagramComponent', () => {
 
     it('should tolerate removing an unknown entity', () => {
       withDiagram();
-      component.entities = [makeEntity({ id: 'e1' })];
+      component.entities = [makeEntity({ id: 'e1', key: 'Invoice' })];
+      component.relationships = [relationship({ from: 'Invoice', to: 'Customer' })];
 
       component.handleRemove('ghost');
 
       expect(component.entities.length).toBe(1);
+      expect(component.relationships.length).toBe(1);
     });
 
     it('should drop a relationship that only points AT the removed entity', () => {
-      // Drives the right operand of `r.from !== id && r.to !== id`, which the
-      // source-side case short-circuits past.
+      // Drives the right operand of `r.from !== removedKey && r.to !== removedKey`,
+      // which the source-side case short-circuits past.
       withDiagram();
       component.entities = [makeEntity({ id: 'e1', key: 'Invoice' })];
       component.relationships = [
-        relationship({ from: 'other', to: 'e1' }),
+        relationship({ from: 'other', to: 'Invoice' }),
         relationship({ id: 'rel-2', from: 'other', to: 'kept' })
       ];
 
@@ -1594,6 +1596,7 @@ describe('DiagramComponent', () => {
       expect(source.items[1].unique).toBeFalse();
       expect(component.relationships.length).toBe(1);
       expect(component.relationships[0].text).toBe('1:N');
+      expect(component.relationships[0].fromColumn).toBe('Invoice_id');
       expect(component.selectedRelationshipType).toBeNull();
     });
 
@@ -1622,9 +1625,15 @@ describe('DiagramComponent', () => {
       expect(component.entities.length).toBe(3);
       const join = component.entities[2];
       expect(join.key).toBe('Customer_Invoice');
-      expect(join.items.map(i => i.name)).toEqual(['Customer_id', 'Invoice_id']);
-      expect(join.items.every(i => i.fk)).toBeTrue();
-      expect(component.relationships.length).toBe(2);
+      expect(join.items.map(i => i.name)).toEqual(['id', 'Customer_id', 'Invoice_id']);
+      expect(join.items[0].pk).toBeTrue();
+      expect(join.items[0].autoIncrement).toBeTrue();
+      expect(join.items.slice(1).every(i => i.fk && !i.pk)).toBeTrue();
+      // Both links start at the join table, which holds both foreign keys.
+      expect(component.relationships.map(r => [r.from, r.to, r.fromColumn])).toEqual([
+        ['Customer_Invoice', 'Customer', 'Customer_id'],
+        ['Customer_Invoice', 'Invoice', 'Invoice_id']
+      ]);
     });
 
     it('should do nothing when the selection is incomplete', () => {

@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { DiagramComponent } from './diagram.component';
 import { DiagramRendererService } from './diagram-renderer.service';
 import { StompClientFactory } from './stomp-client.factory';
-import { DdlService } from '../service/ddl.service';
+import { DdlService, ImportDdlResponse } from '../service/ddl.service';
 import { DiagramService } from '../service/diagram.service';
 import { ProjectService } from '../service/project.service';
 import { StorageService } from '../service/storage.service';
@@ -2026,6 +2026,29 @@ describe('DiagramComponent', () => {
     });
   });
 
+  describe('describeImport', () => {
+    it('should keep the old message for a server that reports nothing', () => {
+      expect(component.describeImport(null)).toBe('DDL imported successfully! Reloading diagram...');
+    });
+
+    it('should only count the tables and relationships when nothing was left out', () => {
+      expect(component.describeImport({ tables: 3, relationships: 2, warnings: [] }))
+        .toBe('DDL imported: 3 table(s) and 2 relationship(s).');
+      expect(component.describeImport({ tables: 3, relationships: 2 } as unknown as ImportDdlResponse))
+        .toBe('DDL imported: 3 table(s) and 2 relationship(s).');
+    });
+
+    it('should list at most ten warnings and count the rest', () => {
+      const warnings = Array.from({ length: 12 }, (_, index) => `warning ${index + 1}`);
+
+      const lines = component.describeImport({ tables: 1, relationships: 0, warnings }).split('\n');
+
+      expect(lines.filter(line => line.startsWith('- ')).length).toBe(10);
+      expect(lines[lines.length - 2]).toBe('- warning 10');
+      expect(lines[lines.length - 1]).toBe('...and 2 more.');
+    });
+  });
+
   describe('onFileSelected', () => {
     let input: HTMLInputElement;
 
@@ -2054,7 +2077,7 @@ describe('DiagramComponent', () => {
     it('should import the file and reload the diagram', async () => {
       component.projectId = 'project-1';
       ddlSpy.readSqlFile.and.resolveTo('CREATE TABLE t();');
-      ddlSpy.importDdl.and.returnValue(of(undefined));
+      ddlSpy.importDdl.and.returnValue(of(null));
 
       component.onFileSelected(selectionEvent('schema.sql'));
       await ddlSpy.readSqlFile.calls.mostRecent().returnValue;
@@ -2066,9 +2089,27 @@ describe('DiagramComponent', () => {
       expect(diagramSpy.getDiagram).toHaveBeenCalledWith('project-1');
     });
 
+    it('should tell what was imported and what was left out', async () => {
+      component.projectId = 'project-1';
+      ddlSpy.readSqlFile.and.resolveTo('CREATE TABLE t(id INT);');
+      ddlSpy.importDdl.and.returnValue(of({
+        tables: 1, relationships: 0, warnings: ['Table t has no primary key; the editor needs one to edit the table.']
+      }));
+
+      component.onFileSelected(selectionEvent('schema.sql'));
+      await ddlSpy.readSqlFile.calls.mostRecent().returnValue;
+
+      expect(dialogs.alert).toHaveBeenCalledWith(
+        'DDL imported: 1 table(s) and 0 relationship(s).\n\n'
+        + 'Some parts of the script could not be represented:\n'
+        + '- Table t has no primary key; the editor needs one to edit the table.'
+      );
+      expect(diagramSpy.getDiagram).toHaveBeenCalledWith('project-1');
+    });
+
     it('should reset the input immediately', () => {
       ddlSpy.readSqlFile.and.resolveTo('CREATE TABLE t();');
-      ddlSpy.importDdl.and.returnValue(of(undefined));
+      ddlSpy.importDdl.and.returnValue(of(null));
 
       component.onFileSelected(selectionEvent('schema.sql'));
 

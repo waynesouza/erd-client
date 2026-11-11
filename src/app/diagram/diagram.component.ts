@@ -12,7 +12,7 @@ import { IntermediaryEntityModel } from '../model/intermediary-entity.model';
 import { AttributeModel } from '../model/attribute.model';
 import { LinkDataModel } from '../model/link-data.model';
 import { DataType } from '../model/enum/datatype.enum';
-import { DdlService } from '../service/ddl.service';
+import { DdlService, ImportDdlResponse } from '../service/ddl.service';
 import { CollaborationService, EntityLock, CollaborationMessage } from '../service/collaboration.service';
 import { ProjectService } from '../service/project.service';
 import { Project } from '../model/project.model';
@@ -21,6 +21,9 @@ import { AuthResponseModel } from '../model/auth-response.model';
 import { environment } from '../../environments/environment';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
+
+// An alert does not scroll, so a long list of import warnings is cut short.
+const MAX_LISTED_IMPORT_WARNINGS = 10;
 
 @Component({
   selector: 'app-diagram',
@@ -1356,9 +1359,9 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
       };
 
       this.ddlService.importDdl(importRequest).subscribe({
-        next: () => {
+        next: (result) => {
           console.log('DDL imported successfully');
-          alert('DDL imported successfully! Reloading diagram...');
+          alert(this.describeImport(result));
           // Reload the diagram data
           this.loadDiagramData(this.projectId);
         },
@@ -1378,6 +1381,25 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
 
     // Reset file input
     input.value = '';
+  }
+
+  // What was imported and, when the script had parts a diagram cannot
+  // represent, which ones, so the user knows what was left out.
+  describeImport(result: ImportDdlResponse | null): string {
+    if (!result) {
+      return 'DDL imported successfully! Reloading diagram...';
+    }
+
+    const lines = [`DDL imported: ${result.tables} table(s) and ${result.relationships} relationship(s).`];
+    const warnings = result.warnings ?? [];
+    if (warnings.length > 0) {
+      lines.push('', 'Some parts of the script could not be represented:');
+      warnings.slice(0, MAX_LISTED_IMPORT_WARNINGS).forEach(warning => lines.push(`- ${warning}`));
+      if (warnings.length > MAX_LISTED_IMPORT_WARNINGS) {
+        lines.push(`...and ${warnings.length - MAX_LISTED_IMPORT_WARNINGS} more.`);
+      }
+    }
+    return lines.join('\n');
   }
 
   private showPermissionDeniedMessage(): void {

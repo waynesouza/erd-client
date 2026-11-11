@@ -1146,6 +1146,14 @@ describe('DiagramComponent', () => {
       expect(renderer.create).toHaveBeenCalled();
     });
 
+    it('should adopt the revision of the loaded diagram', () => {
+      diagramSpy.getDiagram.and.returnValue(of({ nodeDataArray: [], linkDataArray: [], revision: 3 }));
+
+      load();
+
+      expect((component as unknown as { baseRevision: number | null }).baseRevision).toBe(3);
+    });
+
     it('should default a missing location to the origin', () => {
       diagramSpy.getDiagram.and.returnValue(of({
         nodeDataArray: [{ id: 'e1', key: 'Customer', items: [] } as unknown as EntityModel],
@@ -1178,6 +1186,7 @@ describe('DiagramComponent', () => {
 
       expect(component.entities).toEqual([]);
       expect(component.relationships).toEqual([]);
+      expect((component as unknown as { baseRevision: number | null }).baseRevision).toBeNull();
       expect(renderer.create).toHaveBeenCalled();
     });
 
@@ -1765,6 +1774,74 @@ describe('DiagramComponent', () => {
 
       expect(() => component.receiveMessageAndRemakeDiagram({ body: 'not json' })).toThrow();
     });
+
+    describe('when the diagram is replaced by an import', () => {
+      const users = { id: 'e1', key: 'users', items: [], location: { x: 0, y: 0 } };
+      const imported = { id: 'e9', key: 'imported', items: [], location: { x: 0, y: 0 } };
+      const receive = (state: Record<string, unknown>) =>
+        component.receiveMessageAndRemakeDiagram({ body: JSON.stringify(state) });
+
+      beforeEach(() => {
+        withDiagram();
+        receive({ nodeDataArray: [users], linkDataArray: [], revision: 1 });
+      });
+
+      it('should drop a pending local change instead of replaying it', () => {
+        component.entities.push(makeEntity({ id: 'e2', key: 'added_before_the_import' }));
+
+        receive({ nodeDataArray: [imported], linkDataArray: [], revision: 2 });
+
+        expect(component.entities.map(entity => entity.key)).toEqual(['imported']);
+        expect(dialogs.alert).toHaveBeenCalledOnceWith(
+          'The diagram was replaced by an imported script. Your unsaved changes were discarded.'
+        );
+      });
+
+      it('should close the open editors without unlocking', () => {
+        component.isEntityEditorModalOpen = true;
+        component.selectedEntity = { id: 'e1' };
+        component.showTableEditor = true;
+        component.selectedRelationshipType = '1:N';
+
+        receive({ nodeDataArray: [imported], linkDataArray: [], revision: 2 });
+
+        expect(component.isEntityEditorModalOpen).toBeFalse();
+        expect(component.selectedEntity).toEqual({});
+        expect(component.showTableEditor).toBeFalse();
+        expect(component.selectedRelationshipType).toBeNull();
+        // The server released the locks of the replaced tables itself.
+        expect(collaboration.unlockEntity).not.toHaveBeenCalled();
+        expect(dialogs.alert).toHaveBeenCalledTimes(1);
+      });
+
+      it('should not interrupt a user who had nothing to lose', () => {
+        receive({ nodeDataArray: [imported], linkDataArray: [], revision: 2 });
+
+        expect(component.entities.map(entity => entity.key)).toEqual(['imported']);
+        expect(dialogs.alert).not.toHaveBeenCalled();
+      });
+
+      it('should keep replaying pending changes while the revision stays the same', () => {
+        component.entities[0].key = 'customers';
+
+        receive({ nodeDataArray: [users], linkDataArray: [], revision: 1 });
+
+        expect(component.entities.map(entity => entity.key)).toEqual(['customers']);
+      });
+    });
+
+    it('should treat a first state at revision 0 as the diagram already loaded', () => {
+      // A diagram never replaced is at revision 0, also when it could not be loaded
+      // and the client started from an empty one.
+      withDiagram();
+      component.entities = [makeEntity({ id: 'e2', key: 'added_locally' })];
+
+      component.receiveMessageAndRemakeDiagram({
+        body: JSON.stringify({ nodeDataArray: [], linkDataArray: [], revision: 0 })
+      });
+
+      expect(component.entities.map(entity => entity.key)).toEqual(['added_locally']);
+    });
   });
 
   // ============================================================ modal & sync
@@ -1825,8 +1902,23 @@ describe('DiagramComponent', () => {
       expect(stompClient.published[0].destination).toBe('/app/patch');
       const body = JSON.parse(stompClient.published[0].body);
       expect(body.projectId).toBe('project-1');
+      expect(body.baseRevision).toBeNull();
       expect(body.upsertNodes.length).toBe(1);
       expect(body.removedNodeIds).toEqual([]);
+    });
+
+    it('should send the revision its changes were computed against', () => {
+      stompClient.connected = true;
+      component.projectId = 'project-1';
+      withDiagram();
+      component.receiveMessageAndRemakeDiagram({
+        body: JSON.stringify({ nodeDataArray: [], linkDataArray: [], revision: 4 })
+      });
+      component.entities = [makeEntity()];
+
+      component.sendToServer();
+
+      expect(JSON.parse(stompClient.published[0].body).baseRevision).toBe(4);
     });
 
     it('should publish nothing when nothing changed', () => {
@@ -1891,7 +1983,7 @@ describe('DiagramComponent', () => {
       expect(console.error).toHaveBeenCalledWith('No project selected for import');
     });
 
-    it('should open the file picker', () => {
+    it('should open the file picker once the replacement is confirmed', () => {
       component.projectId = 'project-1';
       const input = document.createElement('input');
       const click = spyOn(input, 'click');
@@ -1899,7 +1991,22 @@ describe('DiagramComponent', () => {
 
       component.importDdl();
 
+      expect(dialogs.confirm).toHaveBeenCalledOnceWith(
+        'Importing a script replaces the whole diagram for every collaborator. Continue?'
+      );
       expect(click).toHaveBeenCalled();
+    });
+
+    it('should not open the file picker when the replacement is cancelled', () => {
+      component.projectId = 'project-1';
+      dialogs.confirm.and.returnValue(false);
+      const input = document.createElement('input');
+      const click = spyOn(input, 'click');
+      component.fileInput = { nativeElement: input };
+
+      component.importDdl();
+
+      expect(click).not.toHaveBeenCalled();
     });
 
     it('should tolerate the file input not being rendered', () => {
@@ -1969,6 +2076,21 @@ describe('DiagramComponent', () => {
 
       expect(dialogs.alert).toHaveBeenCalledWith(
         'Error importing DDL. Please check the file format and try again.'
+      );
+    });
+
+    it('should show the reason the server gives for refusing a script', async () => {
+      component.projectId = 'project-1';
+      ddlSpy.readSqlFile.and.resolveTo('SELECT 1;');
+      ddlSpy.importDdl.and.returnValue(throwError(() => ({
+        status: 400, error: { message: 'No CREATE TABLE statement could be read from the script.' }
+      })));
+
+      component.onFileSelected(selectionEvent('schema.sql'));
+      await ddlSpy.readSqlFile.calls.mostRecent().returnValue;
+
+      expect(dialogs.alert).toHaveBeenCalledWith(
+        'Error importing DDL: No CREATE TABLE statement could be read from the script.'
       );
     });
 

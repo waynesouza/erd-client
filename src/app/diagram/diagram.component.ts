@@ -37,6 +37,9 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   // The last state received from the server. Local changes are sent as a patch
   // against it, and replayed on top of every newer state that arrives.
   private baseState: DiagramState = { entities: [], relationships: [] };
+  // The revision of baseState. The server increments it when it replaces the
+  // whole diagram, and drops patches computed against an earlier one.
+  private baseRevision: number | null = null;
   darkMode: boolean = false;
   showTableEditor: boolean = false;
   showLegend: boolean = false;
@@ -274,6 +277,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
           this.entities = diagramData.nodeDataArray;
           this.relationships = diagramData.linkDataArray || [];
           this.baseState = snapshotDiagram(this.entities, this.relationships);
+          this.baseRevision = diagramData.revision ?? null;
           this.setupDiagram();
         } else {
           console.error('Invalid diagram data received:', diagramData);
@@ -301,6 +305,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     this.relationships = [];
     this.locations = [];
     this.baseState = { entities: [], relationships: [] };
+    this.baseRevision = null;
     this.initializeDiagram();
   }
 
@@ -1199,13 +1204,38 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     // Changes not yet acknowledged by the server would be lost by adopting its
     // state as is; they are replayed on top of it instead.
     const pending = diffDiagram(this.baseState, snapshotDiagram(this.entities, this.relationships));
-    this.baseState = snapshotDiagram(data.nodeDataArray, data.linkDataArray || []);
-    const merged = applyDiagramPatch(snapshotDiagram(data.nodeDataArray, data.linkDataArray || []), pending);
+    // A new revision means the whole diagram was replaced, as an import does.
+    // The pending changes refer to the tables it removed, so replaying them
+    // would bring those tables back; they are dropped instead. A diagram that
+    // was never replaced is at revision 0.
+    const revision: number | null = data.revision ?? null;
+    const replaced = revision !== null && revision !== (this.baseRevision ?? 0);
+    const discardsWork = replaced && (this.isEntityEditorModalOpen || !isEmptyPatch(pending));
+    if (replaced) {
+      this.leaveReplacedDiagram();
+    }
+    this.baseRevision = revision;
+    const links = data.linkDataArray || [];
+    this.baseState = snapshotDiagram(data.nodeDataArray, links);
+    const serverState = snapshotDiagram(data.nodeDataArray, links);
+    const merged = replaced ? serverState : applyDiagramPatch(serverState, pending);
     this.locations = merged.entities.map((entity: EntityModel) => ({ x: entity.location.x, y: entity.location.y }));
     this.entities = merged.entities;
     this.relationships = merged.relationships;
     this.remakeDiagram();
     this.isUpdatingFromServer = false;
+    if (discardsWork) {
+      alert('The diagram was replaced by an imported script. Your unsaved changes were discarded.');
+    }
+  }
+
+  // The table being edited may no longer exist, and the server has released its
+  // lock, so the editors are closed without saving.
+  private leaveReplacedDiagram(): void {
+    this.isEntityEditorModalOpen = false;
+    this.selectedEntity = {};
+    this.showTableEditor = false;
+    this.cancelRelationshipSelection();
   }
 
   // Entity editor modal
@@ -1242,7 +1272,7 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
     if (this.stompClient && this.stompClient.connected) {
       this.stompClient.publish({
         destination: '/app/patch',
-        body: JSON.stringify({ projectId: this.projectId, ...patch })
+        body: JSON.stringify({ projectId: this.projectId, baseRevision: this.baseRevision, ...patch })
       });
     } else {
       console.log('Cannot send message, stompClient is not connected');
@@ -1271,6 +1301,10 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
   importDdl(): void {
     if (!this.projectId) {
       console.error('No project selected for import');
+      return;
+    }
+
+    if (!confirm('Importing a script replaces the whole diagram for every collaborator. Continue?')) {
       return;
     }
 
@@ -1308,7 +1342,11 @@ export class DiagramComponent implements OnInit, OnDestroy, DiagramRenderHost {
         },
         error: (error) => {
           console.error('Error importing DDL:', error);
-          alert('Error importing DDL. Please check the file format and try again.');
+          // The server explains why a script was refused, e.g. when it has no table.
+          const reason = error.error?.message;
+          alert(reason
+            ? `Error importing DDL: ${reason}`
+            : 'Error importing DDL. Please check the file format and try again.');
         }
       });
     }).catch((error) => {
